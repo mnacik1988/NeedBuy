@@ -1,0 +1,19 @@
+{
+  "name": "NeedBuy",
+  "short_name": "NeedBuy",
+  "description": "NeedBuy — список покупок голосом: скажи, что нужно купить, приложение само разложит по отделам магазина и покажет картинки товаров",
+  "id": "/NeedBuy/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "ru",
+  "dir": "ltr",
+  "categories": ["shopping", "lifestyle", "productivity"],
+  "background_color": "#F6F4EF",
+  "theme_color": "#F6F4EF",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
