@@ -1,7 +1,7 @@
 /* NeedBuy service worker — офлайн-оболочка.
    Стратегия: сеть первым делом, кэш как запасной вариант.
    ВАЖНО: при каждом релизе поднимать CACHE_NAME вместе с APP_VERSION в index.html. */
-var CACHE_NAME = 'needbuy-v0.5';
+var CACHE_NAME = 'needbuy-v1.0.0';
 var ASSETS = ['./', './index.html', './catalog.js', './icons.js', './manifest.json',
               './icon.png', './icon-maskable.png', './apple-touch-icon.png'];
 
