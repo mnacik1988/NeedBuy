@@ -95,7 +95,7 @@ input,select,textarea{font:inherit;color:inherit}
 .tile{position:relative;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
   background:var(--card);border:1px solid var(--card-brd);border-radius:var(--r);
   box-shadow:var(--shadow),inset 0 1px 0 var(--card-hi);
-  padding:14px 12px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:152px;
+  padding:14px 12px 40px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:158px;
   transition:transform .14s,box-shadow .14s,opacity .2s}
 .tile:active{transform:translateY(2px) scale(.975);
   box-shadow:0 1px 2px rgba(45,50,38,.08),0 2px 6px rgba(45,50,38,.08),inset 0 1px 0 var(--card-hi)}
@@ -116,6 +116,12 @@ input,select,textarea{font:inherit;color:inherit}
 .tile .more{position:absolute;top:7px;left:7px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
   color:var(--muted);background:var(--surface2);border:1px solid var(--card-brd);box-shadow:inset 0 1px 0 var(--card-hi)}
 .tile .more:active{transform:scale(.9)}
+/* удалить — сразу на плитке, чтобы не открывать карточку ради одного действия.
+   Нижний угол: текст по центру и до него не достаёт (см. padding-bottom плитки). */
+.tile .del{position:absolute;right:7px;bottom:7px;width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--danger);
+  background:var(--surface2);border:1px solid var(--card-brd);box-shadow:inset 0 1px 0 var(--card-hi)}
+.tile .del:active{transform:scale(.9)}
 /* выделение для удаления пачкой */
 .tile.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),var(--shadow)}
 .tick.on{background:var(--accent-grad);border-color:transparent;
@@ -218,7 +224,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.4';
+var APP_VERSION = '0.5';
 var WORKER_URL  = '';          /* появится, когда заведём воркер NeedBuy */
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -237,6 +243,7 @@ ru:{list:'Список',frequent:'Часто',settings:'Настройки',list
   listen:'Слушаю…',noVoice:'Голосовой ввод не поддерживается в этом браузере',
   micDenied:'Нет доступа к микрофону',total:'Сумма',pro:'PRO',aiLeft:'ИИ-разборов сегодня',
   select:'Выбрать',selected:'Выбрано',delMany:'Удалить',
+  delQ:'Удалить',delManyQ:'Удалить выбранные товары?',clearQ:'Очистить весь список?',
   version:'Версия',cantDelLast:'Последний список удалить нельзя',sure:'Точно?'},
 en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList:'New list',
   ph:'What to buy?',all:'All',bought:'Bought',left:'left',of:'of',emptyT:'List is empty',
@@ -250,6 +257,7 @@ en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList
   listen:'Listening…',noVoice:'Voice input is not supported in this browser',
   micDenied:'No microphone access',total:'Total',pro:'PRO',aiLeft:'AI parses today',
   select:'Select',selected:'Selected',delMany:'Delete',
+  delQ:'Delete',delManyQ:'Delete selected items?',clearQ:'Clear the whole list?',
   version:'Version',cantDelLast:'Cannot delete the last list',sure:'Are you sure?'},
 uk:{list:'Список',frequent:'Часто',settings:'Налаштування',lists:'Мої списки',newList:'Новий список',
   ph:'Що купити?',all:'Усе',bought:'Куплено',left:'залишилось',of:'з',emptyT:'Список порожній',
@@ -263,6 +271,7 @@ uk:{list:'Список',frequent:'Часто',settings:'Налаштування
   listen:'Слухаю…',noVoice:'Голосове введення не підтримується',
   micDenied:'Немає доступу до мікрофона',total:'Сума',pro:'PRO',aiLeft:'ШІ-розборів сьогодні',
   select:'Обрати',selected:'Обрано',delMany:'Видалити',
+  delQ:'Видалити',delManyQ:'Видалити обрані товари?',clearQ:'Очистити весь список?',
   version:'Версія',cantDelLast:'Останній список видалити не можна',sure:'Точно?'},
 de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen',newList:'Neue Liste',
   ph:'Was kaufen?',all:'Alle',bought:'Gekauft',left:'übrig',of:'von',emptyT:'Liste ist leer',
@@ -276,6 +285,7 @@ de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen
   listen:'Ich höre…',noVoice:'Spracheingabe wird nicht unterstützt',
   micDenied:'Kein Mikrofonzugriff',total:'Summe',pro:'PRO',aiLeft:'KI-Analysen heute',
   select:'Auswählen',selected:'Ausgewählt',delMany:'Löschen',
+  delQ:'Löschen',delManyQ:'Ausgewählte Artikel löschen?',clearQ:'Ganze Liste leeren?',
   version:'Version',cantDelLast:'Die letzte Liste kann nicht gelöscht werden',sure:'Sicher?'},
 fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',newList:'Nouvelle liste',
   ph:'Quoi acheter ?',all:'Tout',bought:'Acheté',left:'restant',of:'sur',emptyT:'Liste vide',
@@ -289,6 +299,7 @@ fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',ne
   listen:'J’écoute…',noVoice:'La saisie vocale n’est pas prise en charge',
   micDenied:'Pas d’accès au micro',total:'Total',pro:'PRO',aiLeft:'Analyses IA aujourd’hui',
   select:'Sélectionner',selected:'Sélectionné',delMany:'Supprimer',
+  delQ:'Supprimer',delManyQ:'Supprimer les articles choisis ?',clearQ:'Vider toute la liste ?',
   version:'Version',cantDelLast:'Impossible de supprimer la dernière liste',sure:'Confirmer ?'}
 };
 function t(k){ return (T5[state.lang]||T5.ru)[k] || (T5.ru[k]||k); }
@@ -298,7 +309,8 @@ var state = {
   lang:'ru', voiceLang:'', theme:'light', group:true, cur:0, tab:'list',
   lists:[{id:'l1', name:'Продукты', items:[]}],
   filter:'', sheet:null, editId:null, listSheet:false, recording:false, hint:'', toast:null,
-  sel:null   /* массив id выделенных товаров; null — обычный режим */
+  sel:null,  /* массив id выделенных товаров; null — обычный режим */
+  ask:null   /* своё окно вопроса вместо системного confirm/prompt */
 };
 var _uid = 0;
 function uid(){ _uid++; return 'i'+Date.now().toString(36)+_uid; }
@@ -482,6 +494,37 @@ function doUndo(){
   }
   _undo = null; state.toast = null; save(); render();
 }
+/* --------------------------- своё окно вопроса ---------------------------
+   Системные confirm/prompt НЕ используем: в Android-обёртке Mynado они молча
+   не срабатывали и убивали действия целиком. Своя шторка работает везде
+   одинаково — и в браузере, и внутри WebView. */
+var _askFn = null;
+
+function askConfirm(text, fn, okLabel, danger){
+  state.ask = {text:text, ok:okLabel || t('del'), danger:danger !== false};
+  _askFn = fn; render();
+}
+function askPrompt(text, initial, fn, okLabel){
+  state.ask = {text:text, ok:okLabel || t('save'), input:true, val:initial || ''};
+  _askFn = fn; render();
+}
+function askOk(){
+  var fn = _askFn, val = null;
+  if(state.ask && state.ask.input){
+    var el = document.getElementById('ask-inp');
+    val = el ? el.value.trim() : '';
+  }
+  _askFn = null; state.ask = null; render();
+  if(fn) fn(val);
+}
+function askCancel(){ _askFn = null; state.ask = null; render(); }
+
+function askDelItem(id){
+  var list = items(), name = '';
+  for(var i=0;i<list.length;i++) if(list[i].id === id) name = list[i].name;
+  askConfirm(t('delQ') + ' «' + name + '»?', function(){ delItem(id); });
+}
+
 /* ------------------- выделение и удаление пачкой -------------------
    Длинное нажатие на плитку включает режим выделения — привычный жест,
    и он не мешает обычному короткому касанию (оно отмечает «куплено»). */
@@ -532,6 +575,11 @@ function toggleSel(id){
 function delSelected(){
   var ids = state.sel || [];
   if(!ids.length){ endSelection(); return; }
+  askConfirm(t('delManyQ') + ' (' + ids.length + ')', doDelSelected);
+}
+function doDelSelected(){
+  var ids = state.sel || [];
+  if(!ids.length){ endSelection(); return; }
   var list = items(), saved = [];
   for(var i=list.length-1;i>=0;i--){
     if(ids.indexOf(list[i].id) >= 0){ saved.push({i:i, it:list[i]}); list.splice(i,1); }
@@ -569,6 +617,10 @@ function clearDone(){
   toast(t('removed') + ': ' + saved.length, t('undo'), doUndo);
 }
 function clearAll(){
+  state.sheet = null;
+  askConfirm(t('clearQ'), doClearAll, t('clearAll'));
+}
+function doClearAll(){
   _undo = {type:'clear', saved:items().slice()};
   curList().items = [];
   save(); state.sheet = null; render();
@@ -650,6 +702,7 @@ var UI = {
   gear:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a1.7 1.7 0 0 0-1.6-1H1a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 3 9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 3.6V3a2 2 0 1 1 4 0v.1A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 20.4 9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   cart:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.2 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>',
   repeat:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l3 3-3 3"/><path d="M4 12V11a4 4 0 0 1 4-4h12"/><path d="M7 22l-3-3 3-3"/><path d="M20 12v1a4 4 0 0 1-4 4H4"/></svg>',
+  trash:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 4.5h4"/><path d="M6.5 7l.9 12.2A1.8 1.8 0 0 0 9.2 21h5.6a1.8 1.8 0 0 0 1.8-1.8L17.5 7"/><path d="M10.5 11v6M13.5 11v6"/></svg>',
   chev:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
 };
 
@@ -668,7 +721,8 @@ function renderTiles(list){
     var picked = !!(sel && sel.indexOf(it.id) >= 0);
     return '<div class="tile'+(it.done?' done':'')+(picked?' sel':'')+'" data-id="'+it.id+'"'+
       ' oncontextmenu="return false" onclick="tapTile(\''+it.id+'\')">'+
-      (sel ? '' : '<button class="more" onclick="event.stopPropagation();openEdit(\''+it.id+'\')">'+UI.dots+'</button>')+
+      (sel ? '' : '<button class="more" onclick="event.stopPropagation();openEdit(\''+it.id+'\')">'+UI.dots+'</button>'+
+                  '<button class="del" onclick="event.stopPropagation();askDelItem(\''+it.id+'\')">'+UI.trash+'</button>')+
       '<div class="tick'+(picked?' on':'')+'">'+((it.done||picked)?UI.check:'')+'</div>'+
       '<div class="art">'+itemArt(it)+'</div>'+
       '<div class="nm">'+esc(it.name)+'</div>'+
@@ -821,6 +875,16 @@ function renderSettings(){
 }
 
 function renderSheet(){
+  if(state.ask){
+    var a = state.ask;
+    return '<div class="ovl" onclick="askCancel()"><div class="sheet" onclick="event.stopPropagation()">'+
+      '<div class="grab"></div><h3>'+esc(a.text)+'</h3>'+
+      (a.input ? '<div class="fld"><input id="ask-inp" value="'+esc(a.val||'')+'"'+
+                 ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();askOk();}"></div>' : '')+
+      '<button class="btn'+(a.danger?' del':'')+'" onclick="askOk()">'+esc(a.ok)+'</button>'+
+      '<button class="btn ghost" onclick="askCancel()">'+t('cancel')+'</button>'+
+    '</div></div>';
+  }
   if(state.listSheet){
     return '<div class="ovl" onclick="closeSheets()"><div class="sheet" onclick="event.stopPropagation()">'+
       '<div class="grab"></div><h3>'+t('lists')+'</h3>'+
@@ -862,7 +926,7 @@ function renderSheet(){
       '<div class="fld"><label>'+t('price')+'</label><input id="e-price" type="number" step="0.01" inputmode="decimal" value="'+(it.price||'')+'"></div>'+
       '<div class="fld"><label>'+t('note')+'</label><input id="e-note" value="'+esc(it.note||'')+'"></div>'+
       '<button class="btn" onclick="saveEdit()">'+t('save')+'</button>'+
-      '<button class="btn dngr" onclick="delItem(\''+it.id+'\')">'+t('del')+'</button>'+
+      '<button class="btn dngr" onclick="askDelItem(\''+it.id+'\')">'+t('del')+'</button>'+
     '</div></div>';
   }
   return '';
@@ -910,24 +974,28 @@ function closeSheets(){ state.sheet = null; state.listSheet = false; state.editI
 function openEdit(id){ state.sheet = 'edit'; state.editId = id; render(); }
 function pickList(i){ state.cur = i; state.listSheet = false; state.filter = ''; state.tab = 'list'; save(); render(); }
 function newList(){
-  var n = prompt(t('listName'), t('newList'));
-  if(n === null) return;
-  n = n.trim(); if(!n) return;
-  state.lists.push({id:uid(), name:n.slice(0,40), items:[]});
-  state.cur = state.lists.length-1; state.listSheet = false; state.tab = 'list';
-  save(); render();
+  state.listSheet = false;
+  askPrompt(t('listName'), t('newList'), function(name){
+    if(!name) return;
+    state.lists.push({id:uid(), name:name.slice(0,40), items:[]});
+    state.cur = state.lists.length-1; state.tab = 'list';
+    save(); render();
+  });
 }
 function renameList(){
-  var n = prompt(t('listName'), curList().name);
-  if(n === null) return;
-  n = n.trim(); if(!n) return;
-  curList().name = n.slice(0,40); state.sheet = null; save(); render();
+  state.sheet = null;
+  askPrompt(t('listName'), curList().name, function(name){
+    if(!name) return;
+    curList().name = name.slice(0,40); save(); render();
+  });
 }
 function delList(){
   if(state.lists.length < 2){ toast(t('cantDelLast')); return; }
-  if(!confirm(t('sure'))) return;
-  state.lists.splice(state.cur, 1);
-  state.cur = 0; state.sheet = null; save(); render();
+  state.sheet = null;
+  askConfirm(t('delList') + ' «' + curList().name + '»?', function(){
+    state.lists.splice(state.cur, 1);
+    state.cur = 0; save(); render();
+  });
 }
 function submitAdd(){
   var inp = document.getElementById('addinp');
