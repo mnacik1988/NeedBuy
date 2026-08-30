@@ -46,6 +46,9 @@ html[data-theme="dark"]{
   --accent-sh:0 2px 6px rgba(0,0,0,.4), 0 8px 20px rgba(28,164,94,.28);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* html красим тоже: при оттягивании iOS показывает область ЗА пределами body,
+   и её закрашивает именно html — без этого вылезали чёрные поля */
+html{background:var(--bg);overscroll-behavior:none}
 html,body{margin:0;padding:0;height:100%}
 body{
   background:var(--bg); background-image:var(--bg-grad); background-attachment:fixed; color:var(--text);
@@ -224,7 +227,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.5.1';
+var APP_VERSION = '0.5.2';
 var WORKER_URL  = '';          /* появится, когда заведём воркер NeedBuy */
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -236,7 +239,7 @@ ru:{list:'Список',frequent:'Часто',settings:'Настройки',list
   emptyS:'Скажи или напиши, что нужно купить — например «2 кг яблок и молоко»',
   add:'Добавить',save:'Сохранить',cancel:'Отмена',del:'Удалить',edit:'Товар',
   qty:'Количество',unit:'Единица',price:'Цена за единицу',note:'Заметка',name:'Название',
-  theme:'Тёмная тема',group:'Группировать по отделам',lang:'Язык',voice:'Язык голоса',asUi:'как интерфейс',
+  theme:'Тёмная тема',group:'Сортировать по отделам',lang:'Язык',voice:'Язык голоса',asUi:'как интерфейс',
   clearDone:'Убрать купленное',clearAll:'Очистить список',renameList:'Переименовать',delList:'Удалить список',
   listName:'Название списка',undo:'Вернуть',added:'Добавлено',removed:'Удалено',
   freqT:'Часто покупаете',freqS:'Здесь появятся товары, которые вы берёте регулярно',
@@ -250,7 +253,7 @@ en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList
   emptyS:'Say or type what you need — for example “2 kg apples and milk”',
   add:'Add',save:'Save',cancel:'Cancel',del:'Delete',edit:'Item',
   qty:'Quantity',unit:'Unit',price:'Price per unit',note:'Note',name:'Name',
-  theme:'Dark theme',group:'Group by aisle',lang:'Language',voice:'Voice language',asUi:'same as interface',
+  theme:'Dark theme',group:'Sort by aisle',lang:'Language',voice:'Voice language',asUi:'same as interface',
   clearDone:'Clear bought',clearAll:'Clear list',renameList:'Rename',delList:'Delete list',
   listName:'List name',undo:'Undo',added:'Added',removed:'Removed',
   freqT:'Frequently bought',freqS:'Items you buy regularly will show up here',
@@ -264,7 +267,7 @@ uk:{list:'Список',frequent:'Часто',settings:'Налаштування
   emptyS:'Скажи або напиши, що треба купити — наприклад «2 кг яблук і молоко»',
   add:'Додати',save:'Зберегти',cancel:'Скасувати',del:'Видалити',edit:'Товар',
   qty:'Кількість',unit:'Одиниця',price:'Ціна за одиницю',note:'Нотатка',name:'Назва',
-  theme:'Темна тема',group:'Групувати за відділами',lang:'Мова',voice:'Мова голосу',asUi:'як інтерфейс',
+  theme:'Темна тема',group:'Сортувати за відділами',lang:'Мова',voice:'Мова голосу',asUi:'як інтерфейс',
   clearDone:'Прибрати куплене',clearAll:'Очистити список',renameList:'Перейменувати',delList:'Видалити список',
   listName:'Назва списку',undo:'Повернути',added:'Додано',removed:'Видалено',
   freqT:'Часто купуєте',freqS:'Тут з’являться товари, які ви берете регулярно',
@@ -278,7 +281,7 @@ de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen
   emptyS:'Sag oder schreib, was du brauchst — z. B. „2 kg Äpfel und Milch“',
   add:'Hinzufügen',save:'Speichern',cancel:'Abbrechen',del:'Löschen',edit:'Artikel',
   qty:'Menge',unit:'Einheit',price:'Preis pro Einheit',note:'Notiz',name:'Name',
-  theme:'Dunkles Design',group:'Nach Abteilung gruppieren',lang:'Sprache',voice:'Sprachsprache',asUi:'wie Oberfläche',
+  theme:'Dunkles Design',group:'Nach Abteilung sortieren',lang:'Sprache',voice:'Sprachsprache',asUi:'wie Oberfläche',
   clearDone:'Gekauftes entfernen',clearAll:'Liste leeren',renameList:'Umbenennen',delList:'Liste löschen',
   listName:'Listenname',undo:'Rückgängig',added:'Hinzugefügt',removed:'Gelöscht',
   freqT:'Häufig gekauft',freqS:'Regelmäßig gekaufte Artikel erscheinen hier',
@@ -292,7 +295,7 @@ fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',ne
   emptyS:'Dis ou écris ce qu’il te faut — par exemple « 2 kg de pommes et du lait »',
   add:'Ajouter',save:'Enregistrer',cancel:'Annuler',del:'Supprimer',edit:'Article',
   qty:'Quantité',unit:'Unité',price:'Prix unitaire',note:'Note',name:'Nom',
-  theme:'Thème sombre',group:'Grouper par rayon',lang:'Langue',voice:'Langue vocale',asUi:'comme l’interface',
+  theme:'Thème sombre',group:'Trier par rayon',lang:'Langue',voice:'Langue vocale',asUi:'comme l’interface',
   clearDone:'Retirer les achetés',clearAll:'Vider la liste',renameList:'Renommer',delList:'Supprimer la liste',
   listName:'Nom de la liste',undo:'Annuler',added:'Ajouté',removed:'Supprimé',
   freqT:'Achats fréquents',freqS:'Les articles achetés régulièrement apparaîtront ici',
@@ -644,7 +647,11 @@ function fitAddBar(){
   var bar = document.querySelector('.addbar');
   if(!bar) return;
   var vv = window.visualViewport;
-  if(!vv){ bar.style.transform = ''; return; }
+  var inp = document.getElementById('addinp');
+  /* Поднимаем ТОЛЬКО когда человек печатает. При оттягивании страницы
+     visualViewport тоже шевелится, и без этой проверки панель уезжала вверх
+     посреди экрана — казалось, что приложение сжалось. */
+  if(!vv || !inp || document.activeElement !== inp){ bar.style.transform = ''; return; }
   var hidden = Math.round(window.innerHeight - vv.height - vv.offsetTop);
   bar.style.transform = hidden > 24 ? 'translateY(-' + hidden + 'px)' : '';
 }
@@ -756,15 +763,17 @@ function renderListTab(){
     body = '<div class="empty"><div class="art">'+nbIconSvg('basket',110)+'</div>'+
            '<div class="big">'+t('emptyT')+'</div><div>'+t('emptyS')+'</div></div>';
   } else {
+    /* Отделы задают ПОРЯДОК, но не рвут сетку на строки: раньше каждый отдел
+       начинался с новой строки, и при одном товаре в отделе половина ряда
+       пустовала — список растягивался вниз на пустоту. Теперь плитки идут
+       сплошняком, соседи по отделу просто оказываются рядом. */
     if(state.group && !state.filter){
-      var byCat = {};
-      shown.forEach(function(i){ (byCat[i.cat] = byCat[i.cat] || []).push(i); });
-      Object.keys(byCat).sort(function(a,b){ return nbCatOrder(a)-nbCatOrder(b); }).forEach(function(c){
-        body += '<div class="sec-h">'+esc(nbCatName(c,state.lang))+'<span class="cnt">'+byCat[c].length+'</span></div>' + renderTiles(byCat[c]);
+      shown = shown.slice().sort(function(a,b){
+        var d = nbCatOrder(a.cat) - nbCatOrder(b.cat);
+        return d !== 0 ? d : (a.at||0) - (b.at||0);
       });
-    } else if(shown.length){
-      body += renderTiles(shown);
     }
+    if(shown.length) body += renderTiles(shown);
     if(done.length && !state.filter){
       body += '<div class="sec-h">'+t('bought')+'<span class="cnt">'+done.length+'</span>'+
               '<span style="flex:1"></span><button style="color:var(--accent-ink);font-size:12px;font-weight:800;letter-spacing:0" onclick="clearDone()">'+t('clearDone')+'</button></div>' + renderTiles(done);
@@ -832,7 +841,8 @@ function renderAddBar(){
     (state.tab === 'list'
       ? '<div class="addfield">'+
           '<input id="addinp" placeholder="'+t('ph')+'" autocomplete="off" autocapitalize="sentences"'+
-            ' enterkeyhint="done" onkeydown="if(event.key===\'Enter\'){event.preventDefault();submitAdd();}">'+
+            ' enterkeyhint="done" onfocus="fitAddBar()" onblur="fitAddBar()"'+
+            ' onkeydown="if(event.key===\'Enter\'){event.preventDefault();submitAdd();}">'+
           /* mousedown/preventDefault держит фокус в поле: иначе на телефоне первое
              касание уходит на закрытие клавиатуры, а до кнопки уже не доходит */
           '<button type="button" class="rbtn'+(state.recording?' rec':'')+'" onmousedown="event.preventDefault()" onclick="micToggle()">'+UI.mic+'</button>'+
