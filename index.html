@@ -206,7 +206,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.2';
+var APP_VERSION = '0.3';
 var WORKER_URL  = '';          /* появится, когда заведём воркер NeedBuy */
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -505,6 +505,25 @@ function toast(msg, action, fn){
 }
 window._toastAct = function(){ if(state.toast && state.toast.fn) state.toast.fn(); };
 
+/* ------------------- панель ввода и клавиатура -------------------
+   iOS не сжимает макет, когда вылезает клавиатура: position:fixed остаётся
+   внизу МАКЕТА и уезжает под клавиатуру — палец попадает не туда, где кнопку
+   видно, и «+» кажется сломанной. visualViewport сообщает, сколько экрана реально
+   осталось видимым; на эту разницу и поднимаем панель. */
+var _hintTimer = null;
+function fitAddBar(){
+  var bar = document.querySelector('.addbar');
+  if(!bar) return;
+  var vv = window.visualViewport;
+  if(!vv){ bar.style.transform = ''; return; }
+  var hidden = Math.round(window.innerHeight - vv.height - vv.offsetTop);
+  bar.style.transform = hidden > 24 ? 'translateY(-' + hidden + 'px)' : '';
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', fitAddBar);
+  window.visualViewport.addEventListener('scroll', fitAddBar);
+}
+
 /* --------------------------- голос --------------------------- */
 var rec = null;
 function voiceLangTag(){
@@ -664,9 +683,12 @@ function renderAddBar(){
   return '<div class="addbar"><div class="addbar-in">'+
     (state.tab === 'list'
       ? '<div class="addfield">'+
-          '<input id="addinp" placeholder="'+t('ph')+'" autocomplete="off" autocapitalize="sentences" onkeydown="if(event.key===\'Enter\')submitAdd()">'+
-          '<button class="rbtn'+(state.recording?' rec':'')+'" onclick="micToggle()">'+UI.mic+'</button>'+
-          '<button class="rbtn go" onclick="submitAdd()">'+UI.plus+'</button>'+
+          '<input id="addinp" placeholder="'+t('ph')+'" autocomplete="off" autocapitalize="sentences"'+
+            ' enterkeyhint="done" onkeydown="if(event.key===\'Enter\'){event.preventDefault();submitAdd();}">'+
+          /* mousedown/preventDefault держит фокус в поле: иначе на телефоне первое
+             касание уходит на закрытие клавиатуры, а до кнопки уже не доходит */
+          '<button type="button" class="rbtn'+(state.recording?' rec':'')+'" onmousedown="event.preventDefault()" onclick="micToggle()">'+UI.mic+'</button>'+
+          '<button type="button" class="rbtn go" onmousedown="event.preventDefault()" onclick="submitAdd()">'+UI.plus+'</button>'+
         '</div>'+
         '<div class="hint" id="hint">'+esc(state.hint)+'</div>'
       : '')+
@@ -777,6 +799,7 @@ function render(){
   var inp = document.getElementById('addinp');
   if(inp && keepVal){ inp.value = keepVal; }
   if(inp && focused){ inp.focus(); }
+  fitAddBar();
 }
 
 /* --------------------------- обработчики --------------------------- */
@@ -813,7 +836,16 @@ function delList(){
 }
 function submitAdd(){
   var inp = document.getElementById('addinp');
-  if(!inp || !inp.value.trim()) return;
+  if(!inp) return;
+  /* пустое поле — не молчим, а открываем клавиатуру и подсказываем */
+  if(!inp.value.trim()){
+    inp.focus();
+    state.hint = t('ph');
+    renderHint();
+    clearTimeout(_hintTimer);
+    _hintTimer = setTimeout(function(){ state.hint = ''; renderHint(); }, 2200);
+    return;
+  }
   var v = inp.value; inp.value = '';
   addText(v);
   render();
