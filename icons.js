@@ -207,7 +207,7 @@ I.sourcream =
 /* ================= ХЛЕБ / ВЫПЕЧКА ================= */
 I.bread =
   '<path d="M18 56 c0 -16 14 -24 32 -24 s32 8 32 24 v18 a6 6 0 0 1 -6 6 H24 a6 6 0 0 1 -6 -6 z" fill="#D89B4E"/>'+
-  '<path d="M50 32 c18 0 32 8 32 24 v18 a6 6 0 0 1 -6 6 H60 V38 c0 -4 -4 -6 -10 -6 z" fill="#BC7F36" opacity=".6"/>'+
+  '<path d="M58 34 c14 4 24 12 24 22 v18 a6 6 0 0 1 -6 6 H58 c6 -7 8 -16 8 -26 c0 -8 -3 -15 -8 -20 z" fill="#BC7F36" opacity=".55"/>'+
   '<path d="M24 56 c0 -10 10 -16 26 -16 s26 6 26 16 z" fill="#EFC489"/>'+
   '<g stroke="#B67B33" stroke-width="2.4" stroke-linecap="round" opacity=".7"><path d="M34 46 l6 -6"/><path d="M48 44 l6 -6"/><path d="M62 46 l6 -6"/></g>';
 
@@ -458,12 +458,43 @@ I.basket =
   '<path d="M56 36 h30 l-8 44 a10 10 0 0 1 -10 8 H50 c6 -2 8 -6 9 -12 z" fill="#C2C9BA"/>'+
   '<g stroke="#B0B8A8" stroke-width="3" stroke-linecap="round"><path d="M36 48 l3 28"/><path d="M50 48 v28"/><path d="M64 48 l-3 28"/></g>';
 
+/* --------------------------------------------------------------------------
+   ОБЪЁМ.
+   Рисунки нарочно собраны из плоских заливок — так они лёгкие и правятся руками.
+   Объём наводится сверху одним фильтром на любую форму, а не дорисовывается
+   в каждой иконке отдельно:
+
+   1. блик — размываем силуэт и светим в него точечным источником сверху слева,
+      подсветка ложится по краю формы, какой бы она ни была;
+   2. подложка — мягкая тень под предметом, чтобы он «лежал» на плитке, а не был
+      наклеен на неё.
+
+   Фильтр объявляется в документе ОДИН раз (nbDefsSvg), иконки только ссылаются
+   на него — иначе в списке из двадцати плиток было бы двадцать копий.
+   -------------------------------------------------------------------------- */
+var DEFS =
+  '<svg width="0" height="0" style="position:absolute" aria-hidden="true">'+
+  '<filter id="nb3d" x="-25%" y="-25%" width="150%" height="155%" color-interpolation-filters="sRGB">'+
+    '<feGaussianBlur in="SourceAlpha" stdDeviation="3.2" result="b"/>'+
+    '<feSpecularLighting in="b" surfaceScale="3.1" specularConstant="0.52" specularExponent="26"'+
+      ' lighting-color="#ffffff" result="sp"><fePointLight x="26" y="14" z="58"/></feSpecularLighting>'+
+    '<feComposite in="sp" in2="SourceAlpha" operator="in" result="spc"/>'+
+    '<feComposite in="SourceGraphic" in2="spc" operator="arithmetic" k1="0" k2="1" k3="1" k4="0" result="lit"/>'+
+    '<feDropShadow in="lit" dx="0" dy="4" stdDeviation="3.2" flood-color="#20261A" flood-opacity="0.32"/>'+
+  '</filter>'+
+  '</svg>';
+
 /* Публичный API */
 g.NB_ICONS = I;
-g.nbIconSvg = function(key, size){
+g.nbDefsSvg = function(){ return DEFS; };
+/* flat=true — без объёма (мелкие места, где фильтр только мылит) */
+g.nbIconSvg = function(key, size, flat){
   var body = I[key] || I.cat_other;
   var s = size || 64;
-  return '<svg viewBox="0 0 100 100" width="'+s+'" height="'+s+'" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+body+'</svg>';
+  /* viewBox шире рисунка: тень и блик выходят за пределы 100×100 и иначе обрежутся */
+  return '<svg viewBox="-9 -8 118 124" width="'+s+'" height="'+s+'" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'+
+    (flat ? body : '<g filter="url(#nb3d)">'+body+'</g>')+
+  '</svg>';
 };
 g.nbHasIcon = function(key){ return !!I[key]; };
 
