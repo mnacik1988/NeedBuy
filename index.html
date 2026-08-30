@@ -92,7 +92,8 @@ input,select,textarea{font:inherit;color:inherit}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 /* плитка — главный носитель объёма: свой градиент, светлая кромка сверху,
    три тени разной мягкости (одна широкая выглядела бы наклейкой) */
-.tile{position:relative;background:var(--card);border:1px solid var(--card-brd);border-radius:var(--r);
+.tile{position:relative;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;
+  background:var(--card);border:1px solid var(--card-brd);border-radius:var(--r);
   box-shadow:var(--shadow),inset 0 1px 0 var(--card-hi);
   padding:14px 12px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;min-height:152px;
   transition:transform .14s,box-shadow .14s,opacity .2s}
@@ -111,7 +112,18 @@ input,select,textarea{font:inherit;color:inherit}
 .tile.done .nm{text-decoration:line-through}
 .tile.done .tick{background:var(--accent-grad);border-color:transparent;
   box-shadow:var(--accent-sh),inset 0 1px 0 rgba(255,255,255,.35)}
-.tile .more{position:absolute;top:8px;left:8px;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted);opacity:.55}
+/* кнопку карточки видно сразу: раньше она была бледной и её не находили */
+.tile .more{position:absolute;top:7px;left:7px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);background:var(--surface2);border:1px solid var(--card-brd);box-shadow:inset 0 1px 0 var(--card-hi)}
+.tile .more:active{transform:scale(.9)}
+/* выделение для удаления пачкой */
+.tile.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent),var(--shadow)}
+.tick.on{background:var(--accent-grad);border-color:transparent;
+  box-shadow:var(--accent-sh),inset 0 1px 0 rgba(255,255,255,.35)}
+.selbar{display:flex;gap:10px}
+.selbar .btn{margin-top:0}
+.btn.del{background:linear-gradient(180deg,#E8483F 0%,#C22A24 100%);color:#fff;
+  box-shadow:0 2px 5px rgba(160,30,25,.3),0 8px 18px rgba(160,30,25,.25),inset 0 1px 0 rgba(255,255,255,.28)}
 
 /* ---------- пусто ---------- */
 .empty{text-align:center;padding:56px 24px;color:var(--muted)}
@@ -206,7 +218,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.3';
+var APP_VERSION = '0.4';
 var WORKER_URL  = '';          /* появится, когда заведём воркер NeedBuy */
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -224,6 +236,7 @@ ru:{list:'Список',frequent:'Часто',settings:'Настройки',list
   freqT:'Часто покупаете',freqS:'Здесь появятся товары, которые вы берёте регулярно',
   listen:'Слушаю…',noVoice:'Голосовой ввод не поддерживается в этом браузере',
   micDenied:'Нет доступа к микрофону',total:'Сумма',pro:'PRO',aiLeft:'ИИ-разборов сегодня',
+  select:'Выбрать',selected:'Выбрано',delMany:'Удалить',
   version:'Версия',cantDelLast:'Последний список удалить нельзя',sure:'Точно?'},
 en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList:'New list',
   ph:'What to buy?',all:'All',bought:'Bought',left:'left',of:'of',emptyT:'List is empty',
@@ -236,6 +249,7 @@ en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList
   freqT:'Frequently bought',freqS:'Items you buy regularly will show up here',
   listen:'Listening…',noVoice:'Voice input is not supported in this browser',
   micDenied:'No microphone access',total:'Total',pro:'PRO',aiLeft:'AI parses today',
+  select:'Select',selected:'Selected',delMany:'Delete',
   version:'Version',cantDelLast:'Cannot delete the last list',sure:'Are you sure?'},
 uk:{list:'Список',frequent:'Часто',settings:'Налаштування',lists:'Мої списки',newList:'Новий список',
   ph:'Що купити?',all:'Усе',bought:'Куплено',left:'залишилось',of:'з',emptyT:'Список порожній',
@@ -248,6 +262,7 @@ uk:{list:'Список',frequent:'Часто',settings:'Налаштування
   freqT:'Часто купуєте',freqS:'Тут з’являться товари, які ви берете регулярно',
   listen:'Слухаю…',noVoice:'Голосове введення не підтримується',
   micDenied:'Немає доступу до мікрофона',total:'Сума',pro:'PRO',aiLeft:'ШІ-розборів сьогодні',
+  select:'Обрати',selected:'Обрано',delMany:'Видалити',
   version:'Версія',cantDelLast:'Останній список видалити не можна',sure:'Точно?'},
 de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen',newList:'Neue Liste',
   ph:'Was kaufen?',all:'Alle',bought:'Gekauft',left:'übrig',of:'von',emptyT:'Liste ist leer',
@@ -260,6 +275,7 @@ de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen
   freqT:'Häufig gekauft',freqS:'Regelmäßig gekaufte Artikel erscheinen hier',
   listen:'Ich höre…',noVoice:'Spracheingabe wird nicht unterstützt',
   micDenied:'Kein Mikrofonzugriff',total:'Summe',pro:'PRO',aiLeft:'KI-Analysen heute',
+  select:'Auswählen',selected:'Ausgewählt',delMany:'Löschen',
   version:'Version',cantDelLast:'Die letzte Liste kann nicht gelöscht werden',sure:'Sicher?'},
 fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',newList:'Nouvelle liste',
   ph:'Quoi acheter ?',all:'Tout',bought:'Acheté',left:'restant',of:'sur',emptyT:'Liste vide',
@@ -272,6 +288,7 @@ fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',ne
   freqT:'Achats fréquents',freqS:'Les articles achetés régulièrement apparaîtront ici',
   listen:'J’écoute…',noVoice:'La saisie vocale n’est pas prise en charge',
   micDenied:'Pas d’accès au micro',total:'Total',pro:'PRO',aiLeft:'Analyses IA aujourd’hui',
+  select:'Sélectionner',selected:'Sélectionné',delMany:'Supprimer',
   version:'Version',cantDelLast:'Impossible de supprimer la dernière liste',sure:'Confirmer ?'}
 };
 function t(k){ return (T5[state.lang]||T5.ru)[k] || (T5.ru[k]||k); }
@@ -280,7 +297,8 @@ function t(k){ return (T5[state.lang]||T5.ru)[k] || (T5.ru[k]||k); }
 var state = {
   lang:'ru', voiceLang:'', theme:'light', group:true, cur:0, tab:'list',
   lists:[{id:'l1', name:'Продукты', items:[]}],
-  filter:'', sheet:null, editId:null, listSheet:false, recording:false, hint:'', toast:null
+  filter:'', sheet:null, editId:null, listSheet:false, recording:false, hint:'', toast:null,
+  sel:null   /* массив id выделенных товаров; null — обычный режим */
 };
 var _uid = 0;
 function uid(){ _uid++; return 'i'+Date.now().toString(36)+_uid; }
@@ -464,6 +482,65 @@ function doUndo(){
   }
   _undo = null; state.toast = null; save(); render();
 }
+/* ------------------- выделение и удаление пачкой -------------------
+   Длинное нажатие на плитку включает режим выделения — привычный жест,
+   и он не мешает обычному короткому касанию (оно отмечает «куплено»). */
+var _lpTimer = null, _lpFired = false, _lpXY = null;
+
+function lpDown(e){
+  if(state.sel) return;                       /* в режиме выделения жест не нужен */
+  var el = e.target && e.target.closest ? e.target.closest('.tile[data-id]') : null;
+  if(!el) return;
+  var id = el.getAttribute('data-id');
+  _lpFired = false;
+  _lpXY = [e.clientX, e.clientY];
+  clearTimeout(_lpTimer);
+  _lpTimer = setTimeout(function(){
+    _lpFired = true;
+    if(navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
+    startSelection(id);
+  }, 460);
+}
+function lpMove(e){
+  /* палец поехал — это прокрутка, а не удержание */
+  if(!_lpXY) return;
+  if(Math.abs(e.clientX-_lpXY[0]) > 10 || Math.abs(e.clientY-_lpXY[1]) > 10) lpCancel();
+}
+function lpCancel(){ clearTimeout(_lpTimer); _lpXY = null; }
+
+document.addEventListener('pointerdown', lpDown, true);
+document.addEventListener('pointermove', lpMove, true);
+document.addEventListener('pointerup', lpCancel, true);
+document.addEventListener('pointercancel', lpCancel, true);
+
+function tapTile(id){
+  if(_lpFired){ _lpFired = false; return; }   /* это было удержание, не касание */
+  if(state.sel) toggleSel(id);
+  else toggleItem(id);
+}
+function startSelection(id){
+  state.sel = id ? [id] : [];
+  state.sheet = null;
+  render();
+}
+function endSelection(){ state.sel = null; render(); }
+function toggleSel(id){
+  var i = state.sel.indexOf(id);
+  if(i >= 0) state.sel.splice(i, 1); else state.sel.push(id);
+  render();
+}
+function delSelected(){
+  var ids = state.sel || [];
+  if(!ids.length){ endSelection(); return; }
+  var list = items(), saved = [];
+  for(var i=list.length-1;i>=0;i--){
+    if(ids.indexOf(list[i].id) >= 0){ saved.push({i:i, it:list[i]}); list.splice(i,1); }
+  }
+  _undo = {type:'del', saved:saved.reverse()};
+  state.sel = null; save(); render();
+  toast(t('removed') + ': ' + saved.length, t('undo'), doUndo);
+}
+
 function toggleItem(id){
   var list = items();
   for(var i=0;i<list.length;i++){
@@ -586,10 +663,13 @@ function qtyLabel(it){
 function itemArt(it){ return nbIconSvg(it.key && nbHasIcon(it.key) ? it.key : nbCatIcon(it.cat), 76); }
 
 function renderTiles(list){
+  var sel = state.sel;
   return '<div class="grid">' + list.map(function(it){
-    return '<div class="tile'+(it.done?' done':'')+'" onclick="toggleItem(\''+it.id+'\')">'+
-      '<button class="more" onclick="event.stopPropagation();openEdit(\''+it.id+'\')">'+UI.dots+'</button>'+
-      '<div class="tick">'+(it.done?UI.check:'')+'</div>'+
+    var picked = !!(sel && sel.indexOf(it.id) >= 0);
+    return '<div class="tile'+(it.done?' done':'')+(picked?' sel':'')+'" data-id="'+it.id+'"'+
+      ' oncontextmenu="return false" onclick="tapTile(\''+it.id+'\')">'+
+      (sel ? '' : '<button class="more" onclick="event.stopPropagation();openEdit(\''+it.id+'\')">'+UI.dots+'</button>')+
+      '<div class="tick'+(picked?' on':'')+'">'+((it.done||picked)?UI.check:'')+'</div>'+
       '<div class="art">'+itemArt(it)+'</div>'+
       '<div class="nm">'+esc(it.name)+'</div>'+
       (qtyLabel(it) ? '<div class="qt">'+esc(qtyLabel(it))+'</div>' : '')+
@@ -664,6 +744,14 @@ function renderHeader(){
   var pct = all.length ? Math.round(done/all.length*100) : 0;
   var title = state.tab === 'list' ? curList().name : (state.tab === 'freq' ? t('frequent') : t('settings'));
 
+  if(state.sel){
+    return '<div class="hd"><div class="hd-row">'+
+      '<div class="hd-title"><span>'+t('selected')+': '+state.sel.length+'</span></div>'+
+      '<div class="hd-spacer"></div>'+
+      '<button class="icon-btn" onclick="endSelection()" style="width:auto;padding:0 14px;font-weight:700">'+t('cancel')+'</button>'+
+      '</div></div>';
+  }
+
   return '<div class="hd"><div class="hd-row">'+
     (state.tab === 'list'
       ? '<button class="hd-title" onclick="openLists()"><span>'+esc(title)+'</span><span class="hd-caret">'+UI.chev+'</span></button>'
@@ -680,6 +768,12 @@ function renderHeader(){
 }
 
 function renderAddBar(){
+  if(state.sel){
+    return '<div class="addbar"><div class="addbar-in"><div class="selbar">'+
+      '<button class="btn ghost" onclick="endSelection()">'+t('cancel')+'</button>'+
+      '<button class="btn del" onclick="delSelected()">'+t('delMany')+(state.sel.length?' · '+state.sel.length:'')+'</button>'+
+    '</div></div></div>';
+  }
   return '<div class="addbar"><div class="addbar-in">'+
     (state.tab === 'list'
       ? '<div class="addfield">'+
@@ -740,6 +834,7 @@ function renderSheet(){
   if(state.sheet === 'menu'){
     return '<div class="ovl" onclick="closeSheets()"><div class="sheet" onclick="event.stopPropagation()">'+
       '<div class="grab"></div><h3>'+esc(curList().name)+'</h3>'+
+      '<button class="btn ghost" onclick="startSelection()">'+t('select')+'</button>'+
       '<button class="btn ghost" onclick="renameList()">'+t('renameList')+'</button>'+
       '<button class="btn ghost" onclick="clearDone()">'+t('clearDone')+'</button>'+
       '<button class="btn dngr" onclick="clearAll()">'+t('clearAll')+'</button>'+
