@@ -227,7 +227,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.5.2';
+var APP_VERSION = '0.5.3';
 var WORKER_URL  = '';          /* появится, когда заведём воркер NeedBuy */
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -366,6 +366,48 @@ var NUMWORDS = {
 };
 /* числа словом, которые сами задают единицу */
 var NUMUNIT = {'полкило':'kg','полкилограмма':'kg','кило':'kg','килограмм':'kg','півкіло':'kg','kilo':'kg','half a kilo':'kg'};
+/* Слова, с которых человек НАЧИНАЕТ фразу, но которые не товар: приказ
+   («купи», «добавь»), вежливость («привет», «спасибо»), обстоятельства
+   («сегодня», «домой», «на ужин»). Список взят из Mynado — он там собран
+   по живым сообщениям, а не придуман: люди диктуют «Привет дорогая, купи
+   сегодня домой хлеб».
+   Срезаем ВСЕ подряд, а не одно слово, и останавливаемся на первом
+   содержательном. Языки слиты в один список: человек может говорить не на
+   том языке, на котором стоит интерфейс, а спутать вежливость с товаром
+   эти слова не могут. */
+var NOISE = ('мне,нам,себе,ты,вы,я,же,ну,вот,так,также,тоже,ещё,еще,там,в,во,на,к,ко,за,из,по,у,и,а,да,'+
+ 'нужно,надо,нужен,нужна,нужны,купить,купи,куплю,покупать,добавь,добавить,запиши,записать,взять,возьми,'+
+ 'бери,забыть,забудь,не,пожалуйста,список,списка,списке,пункт,пункты,продукты,продуктов,покупки,покупок,'+
+ 'еду,еды,магазин,магазине,магазина,'+
+ 'привет,приветик,здравствуй,здравствуйте,добрый,доброе,доброй,утро,утра,день,дня,вечер,вечера,ночи,'+
+ 'спасибо,благодарю,дорогой,дорогая,дорогие,милый,милая,любимый,любимая,целую,люблю,пока,ок,окей,хорошо,'+
+ 'слушай,слышишь,сегодня,завтра,послезавтра,вечером,утром,днём,днем,ночью,потом,сейчас,срочно,домой,'+
+ 'обязательно,ужин,обед,завтрак,'+
+ 'треба,потрібно,купити,додай,додати,візьми,будь,ласка,привіт,вітаю,доброго,доброї,ранку,вечір,дякую,'+
+ 'дорогий,дорога,бувай,добре,гаразд,продукти,продуктів,сьогодні,ввечері,вранці,додому,вечерю,сніданок,'+
+ 'i,need,to,buy,get,add,pick,up,the,my,a,an,and,also,more,please,hi,hello,hey,good,morning,afternoon,'+
+ 'evening,thanks,thank,you,dear,love,honey,bye,ok,okay,groceries,food,shopping,list,today,tonight,'+
+ 'tomorrow,home,dinner,lunch,breakfast,'+
+ 'ich,brauche,kaufen,besorgen,hinzufügen,noch,bitte,hallo,guten,morgen,tag,abend,danke,liebe,lieber,'+
+ 'schatz,tschüss,lebensmittel,einkäufe,liste,heute,hause,abendessen,mittagessen,'+
+ 'il,faut,acheter,prendre,ajouter,encore,de,la,le,les,du,des,au,aux,dans,merci,salut,bonjour,bonsoir,'+
+ 'cher,chère,chéri,chérie,bisous,coucou,courses,nourriture,liste,aujourd,hui,demain,soir,maison,dîner'
+).split(',');
+
+function stripNoise(text){
+  var words = String(text||'').trim().split(/\s+/).filter(Boolean);
+  var i = 0;
+  while(i < words.length){
+    var w = words[i].toLowerCase().replace(/[^0-9a-zа-яёіїєґäöüßàâçèéêîôùû'-]/g,'');
+    if(w && NOISE.indexOf(w) < 0) break;
+    i++;
+  }
+  /* Если служебным оказалось всё до единого слова — ошиблись мы, а не человек.
+     Текст терять нельзя, возвращаем как было. */
+  var rest = words.slice(i).join(' ').replace(/^[\s,;.:—–-]+/,'').trim();
+  return rest || String(text||'').trim();
+}
+
 /* слова-команды, которые надо срезать: «купить», «нужно», «добавь» и т.п. */
 var CMD = /^(?:мне\s+|нам\s+)?(?:нужно|надо|нужен|нужна|нужны|треба|потрібно|купить|купи|купуй|купімо|добавь|добавить|додай|додати|запиши|записать|взять|возьми|не забыть|надо купить|buy|get|add|need|i need|we need|to buy|pick up|kaufen|besorgen|hinzufügen|brauche|ich brauche|acheter|prendre|ajouter|il faut|j'ai besoin de|besoin de)\s+/i;
 var FILLER = /^(?:же|ещё|еще|там|пожалуйста|ще|bitte|please|s'il te plaît|de la|de l'|du |des |le |la |les |a |an |the |ein |eine |einen )\s*/i;
@@ -376,18 +418,29 @@ function normNum(s){
   return isNaN(n) ? null : n;
 }
 function unitFromWord(w){
-  w = w.toLowerCase();
+  w = String(w||'').toLowerCase().replace(/[.,;]+$/,'');
   for(var u in NB_UNIT_WORDS){
     var arr = NB_UNIT_WORDS[u];
-    for(var i=0;i<arr.length;i++) if(w === arr[i] || w.indexOf(arr[i]) === 0) return u;
+    for(var i=0;i<arr.length;i++){
+      /* по началу слова сверяем только длинные единицы («килограмм»).
+         Короткие — точным совпадением: иначе «г» съедала бы «говядину»,
+         а «л» — «лимон». */
+      if(w === arr[i]) return u;
+      if(arr[i].length >= 3 && w.indexOf(arr[i]) === 0) return u;
+    }
   }
   return null;
+}
+function isUnitWord(w){ return unitFromWord(w) !== null; }
+function isNumWord(w){
+  w = String(w||'').toLowerCase();
+  return /^\d+([.,]\d+)?$/.test(w) || NUMWORDS[w] !== undefined;
 }
 /* «2 кг яблок» → {qty:2, unit:'kg', name:'яблок'} */
 function parseOne(raw){
   var s = String(raw||'').trim().replace(/\s+/g,' ');
   if(!s) return null;
-  for(var i=0;i<3;i++){ s = s.replace(CMD,'').replace(FILLER,'').trim(); }
+  s = stripNoise(s);
   if(!s) return null;
 
   var qty = null, unit = null;
@@ -424,10 +477,17 @@ function parseOne(raw){
   var name = s.charAt(0).toUpperCase() + s.slice(1);
   /* Если человек назвал ровно товар и ничего сверх («яблок» → «Яблоки»),
      показываем витринное название. Если добавил уточнение («куриное филе»),
-     оставляем его слова — они несут смысл, которого в каталоге нет. */
+     оставляем его слова — они несут смысл, которого в каталоге нет.
+
+     Но подменять можно ТОЛЬКО когда это то же самое слово в другой форме.
+     Каталог держит синонимы под одним ключом ради иконки и отдела: кефир и
+     творог лежат под «сметаной», фарш под «мясом», мандарины под
+     «апельсинами». Показать человеку «Сметана» вместо сказанного «кефир» —
+     это соврать ему про его же список. Сверяем первые четыре буквы:
+     «яблок»→«Яблоки» и «картошка»→«Картофель» пройдут, «кефир»→«Сметана» нет. */
   if(hit && hit.parts === hit.words){
     var canon = nbTitle(hit.key, state.lang);
-    if(canon) name = canon;
+    if(canon && canon.slice(0,4).toLowerCase() === s.slice(0,4).toLowerCase()) name = canon;
   }
   return {
     name: name,
@@ -438,6 +498,59 @@ function parseOne(raw){
     cat: hit ? hit.cat : 'other'
   };
 }
+/* Речь без запятых: «хлеб молоко яйца кефир» приходит одной строкой.
+   Знаков препинания нет, союзов нет — резать не по чему. Но у нас есть
+   каталог: каждое слово, которое он узнаёт как товар, начинает новый пункт.
+   Слова между товарами (числа, единицы, уточнения) прилипают к своему.
+
+   Именно этого не умеет локальный разбор Mynado — там резку делает ИИ.
+   Каталог позволяет обойтись без него. */
+function splitByProducts(text){
+  var words = String(text||'').trim().split(/\s+/).filter(Boolean);
+  if(words.length < 2) return [text];
+
+  /* размечаем якоря: сперва пробуем тройку слов, потом пару, потом одно —
+     чтобы «туалетная бумага» осталась одним товаром, а не развалилась */
+  var anchor = [], i, w;
+  for(i=0;i<words.length;i++) anchor[i] = 0;
+  for(i=0;i<words.length;i++){
+    for(w=Math.min(3, words.length-i); w>=1; w--){
+      var hit = nbMatch(words.slice(i, i+w).join(' '));
+      if(hit && hit.parts === w){ anchor[i] = w; i += w-1; break; }
+    }
+  }
+
+  var groups = [], cur = [], curHasAnchor = false;
+  for(i=0;i<words.length;i++){
+    var a = anchor[i];
+    if(a && curHasAnchor){
+      /* Количество, стоящее прямо перед новым товаром, принадлежит ЕМУ:
+         «сметана 2 кг яблок» → «сметана» + «2 кг яблок»,
+         «два банана три яблока» → «два банана» + «три яблока».
+         По-русски вслух количество почти всегда идёт ПЕРЕД товаром, а
+         обратный порядок («яблоки 2 кг») люди пишут, а не говорят — и там
+         обычно есть запятая, которая режет фразу раньше нас. */
+      var tail = [];
+      while(cur.length){
+        var last = cur[cur.length-1];
+        if(isNumWord(last) || isUnitWord(last)){ tail.unshift(cur.pop()); continue; }
+        break;
+      }
+      /* Если в остатке не осталось самого товара — забирать нечего,
+         возвращаем всё назад: это была не количественная приставка. */
+      if(!cur.length){ cur = tail; tail = []; }
+      groups.push(cur.join(' '));
+      cur = tail; curHasAnchor = false;
+    }
+    if(a){
+      for(var k=0;k<a;k++) cur.push(words[i+k]);
+      i += a-1; curHasAnchor = true;
+    } else cur.push(words[i]);
+  }
+  if(cur.length) groups.push(cur.join(' '));
+  return groups.length ? groups : [text];
+}
+
 /* «молоко, хлеб и 2 кг яблок» → три товара.
    \b с кириллицей в JS не работает (и — не \w), поэтому союзы режем по пробелам. */
 function parseMany(raw){
@@ -446,8 +559,14 @@ function parseMany(raw){
     .split(/\s*[,;+]\s*|\s+(?:и|і|та|й|and|und|et|plus|плюс)\s+/i);
   var out = [];
   for(var i=0;i<chunks.length;i++){
-    var p = parseOne(chunks[i]);
-    if(p) out.push(p);
+    /* сперва снимаем приказ и вежливость, потом режем по товарам:
+       «привет купи хлеб молоко» → «хлеб» + «молоко» */
+    var clean = stripNoise(chunks[i]);
+    var parts = splitByProducts(clean);
+    for(var j=0;j<parts.length;j++){
+      var p = parseOne(parts[j]);
+      if(p) out.push(p);
+    }
   }
   return out;
 }
@@ -458,12 +577,16 @@ function addText(raw){
   if(!parsed.length) return 0;
   var list = items(), added = [];
   parsed.forEach(function(p){
-    /* тот же товар уже в списке и не куплен → просто увеличиваем количество */
+    /* Тот же товар уже в списке и не куплен → просто увеличиваем количество.
+       Сверяем по НАЗВАНИЮ, а не по ключу каталога: под одним ключом лежат
+       синонимы ради общей иконки и отдела — кефир и сметана оба «sourcream».
+       По ключу они слились бы в один пункт, и человек недосчитался бы
+       половины покупок (найдено живьём). */
     var same = null;
     for(var i=0;i<list.length;i++){
       var it = list[i];
       if(it.done) continue;
-      if((p.key && it.key === p.key) || it.name.toLowerCase() === p.name.toLowerCase()){ same = it; break; }
+      if(it.name.toLowerCase() === p.name.toLowerCase()){ same = it; break; }
     }
     if(same){
       if(p.qty !== null) same.qty = (same.qty||1) + p.qty;
