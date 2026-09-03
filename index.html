@@ -227,8 +227,8 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.5.3';
-var WORKER_URL  = '';          /* появится, когда заведём воркер NeedBuy */
+var APP_VERSION = '0.6.0';
+var WORKER_URL  = 'https://wandering-meadow-aecb.mnacik1988.workers.dev';
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
 
@@ -247,6 +247,7 @@ ru:{list:'Список',frequent:'Часто',settings:'Настройки',list
   micDenied:'Нет доступа к микрофону',total:'Сумма',pro:'PRO',aiLeft:'ИИ-разборов сегодня',
   select:'Выбрать',selected:'Выбрано',delMany:'Удалить',
   delQ:'Удалить',delManyQ:'Удалить выбранные товары?',clearQ:'Очистить весь список?',
+  thinking:'Думаю…',aiOff:'ИИ недоступен, разобрал сам',aiLimit:'ИИ на сегодня закончился, разобрал сам',aiLeftLbl:'Разборов ИИ осталось',
   version:'Версия',cantDelLast:'Последний список удалить нельзя',sure:'Точно?'},
 en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList:'New list',
   ph:'What to buy?',all:'All',bought:'Bought',left:'left',of:'of',emptyT:'List is empty',
@@ -261,6 +262,7 @@ en:{list:'List',frequent:'Frequent',settings:'Settings',lists:'My lists',newList
   micDenied:'No microphone access',total:'Total',pro:'PRO',aiLeft:'AI parses today',
   select:'Select',selected:'Selected',delMany:'Delete',
   delQ:'Delete',delManyQ:'Delete selected items?',clearQ:'Clear the whole list?',
+  thinking:'Thinking…',aiOff:'AI unavailable, parsed locally',aiLimit:'AI quota spent today, parsed locally',aiLeftLbl:'AI parses left',
   version:'Version',cantDelLast:'Cannot delete the last list',sure:'Are you sure?'},
 uk:{list:'Список',frequent:'Часто',settings:'Налаштування',lists:'Мої списки',newList:'Новий список',
   ph:'Що купити?',all:'Усе',bought:'Куплено',left:'залишилось',of:'з',emptyT:'Список порожній',
@@ -275,6 +277,7 @@ uk:{list:'Список',frequent:'Часто',settings:'Налаштування
   micDenied:'Немає доступу до мікрофона',total:'Сума',pro:'PRO',aiLeft:'ШІ-розборів сьогодні',
   select:'Обрати',selected:'Обрано',delMany:'Видалити',
   delQ:'Видалити',delManyQ:'Видалити обрані товари?',clearQ:'Очистити весь список?',
+  thinking:'Думаю…',aiOff:'ШІ недоступний, розібрав сам',aiLimit:'ШІ на сьогодні скінчився, розібрав сам',aiLeftLbl:'Розборів ШІ лишилось',
   version:'Версія',cantDelLast:'Останній список видалити не можна',sure:'Точно?'},
 de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen',newList:'Neue Liste',
   ph:'Was kaufen?',all:'Alle',bought:'Gekauft',left:'übrig',of:'von',emptyT:'Liste ist leer',
@@ -289,6 +292,7 @@ de:{list:'Liste',frequent:'Häufig',settings:'Einstellungen',lists:'Meine Listen
   micDenied:'Kein Mikrofonzugriff',total:'Summe',pro:'PRO',aiLeft:'KI-Analysen heute',
   select:'Auswählen',selected:'Ausgewählt',delMany:'Löschen',
   delQ:'Löschen',delManyQ:'Ausgewählte Artikel löschen?',clearQ:'Ganze Liste leeren?',
+  thinking:'Denke nach…',aiOff:'KI nicht verfügbar, selbst erkannt',aiLimit:'KI-Kontingent aufgebraucht, selbst erkannt',aiLeftLbl:'KI-Analysen übrig',
   version:'Version',cantDelLast:'Die letzte Liste kann nicht gelöscht werden',sure:'Sicher?'},
 fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',newList:'Nouvelle liste',
   ph:'Quoi acheter ?',all:'Tout',bought:'Acheté',left:'restant',of:'sur',emptyT:'Liste vide',
@@ -303,6 +307,7 @@ fr:{list:'Liste',frequent:'Fréquent',settings:'Réglages',lists:'Mes listes',ne
   micDenied:'Pas d’accès au micro',total:'Total',pro:'PRO',aiLeft:'Analyses IA aujourd’hui',
   select:'Sélectionner',selected:'Sélectionné',delMany:'Supprimer',
   delQ:'Supprimer',delManyQ:'Supprimer les articles choisis ?',clearQ:'Vider toute la liste ?',
+  thinking:'Je réfléchis…',aiOff:'IA indisponible, analysé localement',aiLimit:'Quota IA épuisé, analysé localement',aiLeftLbl:'Analyses IA restantes',
   version:'Version',cantDelLast:'Impossible de supprimer la dernière liste',sure:'Confirmer ?'}
 };
 function t(k){ return (T5[state.lang]||T5.ru)[k] || (T5.ru[k]||k); }
@@ -313,7 +318,9 @@ var state = {
   lists:[{id:'l1', name:'Продукты', items:[]}],
   filter:'', sheet:null, editId:null, listSheet:false, recording:false, hint:'', toast:null,
   sel:null,  /* массив id выделенных товаров; null — обычный режим */
-  ask:null   /* своё окно вопроса вместо системного confirm/prompt */
+  ask:null,  /* своё окно вопроса вместо системного confirm/prompt */
+  aiLeft:null, /* сколько разборов ИИ осталось сегодня; null — ещё не спрашивали */
+  busy:false   /* ждём ответ сервера */
 };
 var _uid = 0;
 function uid(){ _uid++; return 'i'+Date.now().toString(36)+_uid; }
@@ -571,10 +578,124 @@ function parseMany(raw){
   return out;
 }
 
+/* --------------------------- сервер и ИИ ---------------------------
+   ИИ — надстройка, а не замена. Локальный разбор работает всегда: мгновенно
+   и без сети, что в магазине важнее красоты. ИИ зовём только там, где местный
+   не справился, — иначе каждое «молоко» тратило бы квоту, а её двадцать в день.
+
+   Признак «не справился» простой: среди разобранного есть товар, которого нет
+   в каталоге. «Продукты на борщ» и «что-нибудь к чаю» дают ровно такой
+   результат — и уходят к ИИ. «Хлеб молоко яйца» опознаётся целиком и остаётся
+   локальным, бесплатным и мгновенным. */
+
+function getDeviceId(){
+  try{
+    var d = localStorage.getItem('needbuy-device');
+    if(!d){
+      d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2,10);
+      localStorage.setItem('needbuy-device', d);
+    }
+    return d;
+  }catch(e){ return 'anon'; }
+}
+
+function aiAvailable(){
+  return !!WORKER_URL && navigator.onLine !== false && state.aiLeft !== 0;
+}
+
+function needsAi(parsed){
+  if(!parsed.length) return true;
+  for(var i=0;i<parsed.length;i++) if(!parsed[i].key) return true;
+  return false;
+}
+
+function aiParse(text, cb){
+  var fired = false;
+  /* Ждать бесконечно нельзя: человек стоит у полки. Не успели за восемь
+     секунд — отдаём локальный разбор, он уже готов. */
+  var timer = setTimeout(function(){ if(!fired){ fired = true; cb(null, 'timeout'); } }, 8000);
+  fetch(WORKER_URL + '/ai/parse', {
+    method:'POST',
+    headers:{ 'content-type':'application/json', 'X-Device-Id':getDeviceId() },
+    body: JSON.stringify({ text:text, lang:state.lang })
+  })
+  .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+  .then(function(res){
+    if(fired) return;
+    fired = true; clearTimeout(timer);
+    var d = res.data || {};
+    if(typeof d.left === 'number') state.aiLeft = d.left;
+    if(res.status === 429 || d.error === 'limit'){ state.aiLeft = 0; cb(null, 'limit'); return; }
+    if(d.error || !d.items){ cb(null, d.error || 'error'); return; }
+    cb(d.items, null);
+  })
+  .catch(function(){ if(!fired){ fired = true; clearTimeout(timer); cb(null, 'network'); } });
+}
+
+function refreshAiLimit(){
+  if(!WORKER_URL) return;
+  fetch(WORKER_URL + '/limit', { headers:{ 'X-Device-Id':getDeviceId() } })
+    .then(function(r){ return r.json(); })
+    .then(function(d){ if(typeof d.left === 'number'){ state.aiLeft = d.left; render(); } })
+    .catch(function(){});
+}
+
+/* Товар от ИИ приводим к своему виду: картинку и отдел ищем в каталоге по
+   названию, а если каталог такого не знает — берём отдел, который определил
+   ИИ. Так незнакомый товар всё равно попадёт на нужную полку. */
+function itemFromAi(a){
+  var hit = nbMatch(a && a.name ? a.name : '');
+  return {
+    id: uid(),
+    name: String(a && a.name ? a.name : '').slice(0,60),
+    qty: (a && typeof a.qty === 'number' && a.qty > 0) ? a.qty : null,
+    unit: (a && a.unit) || (hit ? hit.unit : 'pc'),
+    key: hit ? hit.key : '',
+    cat: hit ? hit.cat : ((a && a.cat) || 'other'),
+    price: null, note:'', done:false, at: Date.now(), ai:true
+  };
+}
+
 /* --------------------------- действия --------------------------- */
 function addText(raw){
   var parsed = parseMany(raw);
-  if(!parsed.length) return 0;
+  if(needsAi(parsed) && aiAvailable()){
+    state.busy = true; state.hint = t('thinking'); render();
+    aiParse(raw, function(aiItems, err){
+      state.busy = false; state.hint = '';
+      if(aiItems && aiItems.length){ putAiItems(aiItems); return; }
+      /* ИИ не ответил или отказал — молча не теряем сказанное,
+         кладём то, что разобрали сами, и объясняем почему. */
+      if(err === 'limit') toast(t('aiLimit'));
+      else if(err) toast(t('aiOff'));
+      addParsed(parsed);
+    });
+    return parsed.length;
+  }
+  return addParsed(parsed);
+}
+
+/* Товары от ИИ кладём тем же путём, что и локальные: тот же поиск дубля
+   по названию, тот же откат кнопкой «Вернуть». */
+function putAiItems(list){
+  var arr = curList().items, added = [];
+  for(var i=0;i<list.length;i++){
+    var it = itemFromAi(list[i]);
+    if(!it.name) continue;
+    var same = null;
+    for(var j=0;j<arr.length;j++){
+      if(!arr[j].done && arr[j].name.toLowerCase() === it.name.toLowerCase()){ same = arr[j]; break; }
+    }
+    if(same){ same.qty = (same.qty||1) + (it.qty||1); added.push(same.id); }
+    else { arr.push(it); added.push(it.id); }
+  }
+  _undo = {type:'add', ids:added};
+  save(); render();
+  toast(t('added') + ': ' + added.length, t('undo'), doUndo);
+}
+
+function addParsed(parsed){
+  if(!parsed.length){ render(); return 0; }
   var list = items(), added = [];
   parsed.forEach(function(p){
     /* Тот же товар уже в списке и не куплен → просто увеличиваем количество.
@@ -1002,6 +1123,7 @@ function renderSettings(){
     }).join('')+
     '<button class="btn ghost" style="margin-top:14px" onclick="newList()">+ '+t('newList')+'</button>'+
     '<div class="sec-h" style="margin-top:26px">'+t('version')+'</div>'+
+    (state.aiLeft !== null ? '<div class="opt"><div class="sp">'+t('aiLeftLbl')+'</div><div class="val">'+state.aiLeft+'</div></div>' : '')+
     '<div class="mini">NeedBuy '+APP_VERSION+' · <span class="badge">'+(WORKER_URL?'online':'offline')+'</span> <span class="badge pro">'+t('pro')+' soon</span><br>'+
     'Иллюстрации нарисованы для этого приложения — сторонних лицензий нет.</div>'+
   '</div>';
@@ -1176,6 +1298,7 @@ document.body.insertAdjacentHTML('afterbegin', nbDefsSvg());
 load();
 if(!state.lists.length) state.lists = [{id:'l1', name:'Продукты', items:[]}];
 render();
+refreshAiLimit();
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
 </script>
 </body>
