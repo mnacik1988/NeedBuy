@@ -227,7 +227,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.6.0';
+var APP_VERSION = '0.6.1';
 var WORKER_URL  = 'https://wandering-meadow-aecb.mnacik1988.workers.dev';
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -603,9 +603,26 @@ function aiAvailable(){
   return !!WORKER_URL && navigator.onLine !== false && state.aiLeft !== 0;
 }
 
-function needsAi(parsed){
-  if(!parsed.length) return true;
-  for(var i=0;i<parsed.length;i++) if(!parsed[i].key) return true;
+/* Человек не назвал товар, а описал повод. Каталог тут бесполезен и,
+   что хуже, может обмануть: во фразе «что-нибудь к чаю» он узнаёт слово
+   «чаю», решает, что справился, и кладёт в список пункт «Что-нибудь к чаю».
+   Поэтому такие обороты отправляем к ИИ по самой фразе, не глядя на разбор. */
+var VAGUE = new RegExp(
+  'что.?нибудь|чего.?нибудь|чем.?нибудь|что.то|щось|чогось|' +
+  'на\\s+(ужин|обед|завтрак|праздник|вечер|неделю|шашлык|пикник)|' +
+  'к\\s+(чаю|кофе|ужину|обеду|завтраку|празднику|столу)|' +
+  'для\\s+(салата|супа|борща|выпечки|торта|пиццы)|' +
+  'something|anything|for\\s+(dinner|lunch|breakfast|the\\s+week)|' +
+  'etwas|zum\\s+(essen|tee|kaffee)|' +
+  'quelque\\s+chose|pour\\s+(le\\s+)?(d[iî]ner|d[ée]jeuner|go[uû]ter)',
+  'i');
+
+function needsAi(parsed, raw){
+  if(VAGUE.test(String(raw||''))) return true;   /* описан повод, а не товар */
+  if(!parsed.length) return true;                /* совсем не разобрали */
+  for(var i=0;i<parsed.length;i++){
+    if(!parsed[i].key) return true;              /* товара нет в каталоге */
+  }
   return false;
 }
 
@@ -659,7 +676,7 @@ function itemFromAi(a){
 /* --------------------------- действия --------------------------- */
 function addText(raw){
   var parsed = parseMany(raw);
-  if(needsAi(parsed) && aiAvailable()){
+  if(needsAi(parsed, raw) && aiAvailable()){
     state.busy = true; state.hint = t('thinking'); render();
     aiParse(raw, function(aiItems, err){
       state.busy = false; state.hint = '';
