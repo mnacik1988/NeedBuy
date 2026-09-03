@@ -14,11 +14,14 @@ from PIL import Image, ImageDraw
 
 S = 512          # итоговый размер
 K = 4            # во сколько раз рисуем крупнее
-BG_TOP    = (26, 175, 85)
-BG_BOTTOM = (13, 118, 55)
-WHITE     = (255, 255, 255)
-APPLE     = (226, 58, 78)
-LEAF      = (76, 175, 80)
+
+# Фамильные цвета: тёмно-синий фон и золотой знак — как у Mynado и InveStory.
+# Знак ОДНОЦВЕТНЫЙ: у Mynado это золотая галочка, у InveStory золотые столбики,
+# у нас золотая корзина. Пёстрый рисунок выбился бы из ряда на домашнем экране.
+BG_TOP    = (30, 42, 74)     # #1E2A4A
+BG_BOTTOM = (16, 24, 44)     # #10182C
+GOLD      = (242, 199, 94)   # #F2C75E
+GOLD_DARK = (208, 154, 46)   # #D09A2E
 
 
 def gradient(size, top, bottom):
@@ -31,34 +34,25 @@ def gradient(size, top, bottom):
     return img.resize((size, size))
 
 
-def draw_basket(d, cx, cy, scale):
+def draw_basket(d, cx, cy, scale, main, deep):
     """Корзина: дужка, ободок, корпус, прорези."""
     def p(x, y):
         return (cx + x * scale, cy + y * scale)
 
     # дужка
     d.arc([p(-88, -132)[0], p(-88, -132)[1], p(88, 44)[0], p(88, 44)[1]],
-          start=185, end=355, fill=WHITE, width=int(26 * scale))
+          start=185, end=355, fill=main, width=int(26 * scale))
 
     # ободок
-    d.rounded_rectangle([p(-116, -30), p(116, 16)], radius=int(23 * scale), fill=WHITE)
+    d.rounded_rectangle([p(-116, -30), p(116, 16)], radius=int(23 * scale), fill=main)
 
     # корпус — сужается книзу
-    d.polygon([p(-100, 16), p(100, 16), p(74, 132), p(-74, 132)], fill=WHITE)
-    d.rounded_rectangle([p(-78, 104), p(78, 136)], radius=int(18 * scale), fill=WHITE)
+    d.polygon([p(-100, 16), p(100, 16), p(74, 132), p(-74, 132)], fill=main)
+    d.rounded_rectangle([p(-78, 104), p(78, 136)], radius=int(18 * scale), fill=main)
 
-    # прорези корзины
+    # прорези: цветом фона, поэтому корзина читается как плетёная
     for x0, x1 in ((-46, -38), (-4, -4), (42, 34)):
-        d.line([p(x0, 34), p(x1, 108)], fill=BG_BOTTOM, width=int(15 * scale))
-
-
-def draw_apple(d, cx, cy, r):
-    """Яблоко, выглядывающее из корзины — цветовое пятно и отсылка к примеру."""
-    d.line([(cx, cy - r * 0.7), (cx - r * 0.25, cy - r * 1.5)],
-           fill=(107, 74, 43), width=max(2, int(r * 0.2)))
-    d.polygon([(cx + r * 0.08, cy - r * 1.2), (cx + r * 0.7, cy - r * 1.55),
-               (cx + r * 0.95, cy - r * 1.15), (cx + r * 0.4, cy - r * 0.95)], fill=LEAF)
-    d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=APPLE)
+        d.line([p(x0, 34), p(x1, 108)], fill=deep, width=int(15 * scale))
 
 
 def build(inner_scale, out, size=S):
@@ -77,8 +71,9 @@ def build(inner_scale, out, size=S):
     d = ImageDraw.Draw(img)
     cx = cy = big / 2
     s = K * inner_scale
-    draw_apple(d, cx + 88 * s, cy - 48 * s, 42 * s)
-    draw_basket(d, cx, cy + 12 * s, s)
+    # тень под знаком — тем же синим, только глубже: даёт объём, как в приложении
+    draw_basket(d, cx, cy + 12 * s + 5 * s, s, (10, 16, 30), (10, 16, 30))
+    draw_basket(d, cx, cy + 12 * s, s, GOLD, BG_BOTTOM)
 
     img.resize((size, size), Image.LANCZOS).save(out)
     print('готово:', out, size)
