@@ -227,7 +227,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.6.2';
+var APP_VERSION = '0.6.3';
 var WORKER_URL  = 'https://wandering-meadow-aecb.mnacik1988.workers.dev';
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -516,7 +516,9 @@ function parseOne(raw){
 var ADJ_END = /(ая|яя|ую|юю|ое|ее|ые|ие|ый|ий|ого|его|ых|их|ыми|ими)$/i;
 function looksAdjective(w){
   w = String(w||'').toLowerCase();
-  return w.length >= 6 && ADJ_END.test(w);
+  /* пять букв, а не шесть: «белый», «серый», «сухие» тоже прилагательные,
+     а существительных такой длины с этими окончаниями практически нет */
+  return w.length >= 5 && ADJ_END.test(w);
 }
 
 /* Речь без запятых: «хлеб молоко яйца кефир» приходит одной строкой.
@@ -526,6 +528,10 @@ function looksAdjective(w){
 
    Именно этого не умеет локальный разбор Mynado — там резку делает ИИ.
    Каталог позволяет обойтись без него. */
+/* Ставится, когда разделитель наткнулся на случай, который в принципе не
+   решается без понимания смысла (см. ниже). Читает его needsAi. */
+var _splitAmbiguous = false;
+
 function splitByProducts(text){
   var words = String(text||'').trim().split(/\s+/).filter(Boolean);
   if(words.length < 2) return [text];
@@ -550,6 +556,14 @@ function splitByProducts(text){
   for(i=0;i<words.length;i++){
     var a = anchor[i];
     if(a && curHasAnchor){
+      /* Прилагательное между двумя товарами — тупик для любого правила.
+         «сыр белый хлеб» — «белый» относится к хлебу.
+         «хлеб чёрный молоко» — «чёрный» относится к хлебу.
+         Слова расставлены одинаково, а смысл противоположный: по-русски
+         определение может стоять и до, и после своего слова. Угадывать здесь
+         значит гарантированно ошибаться в половине случаев, поэтому честнее
+         передать фразу ИИ — он понимает, что белым бывает хлеб, а не сыр. */
+      if(i > 0 && looksAdjective(words[i-1])) _splitAmbiguous = true;
       /* Количество, стоящее прямо перед новым товаром, принадлежит ЕМУ:
          «сметана 2 кг яблок» → «сметана» + «2 кг яблок»,
          «два банана три яблока» → «два банана» + «три яблока».
@@ -580,6 +594,7 @@ function splitByProducts(text){
 /* «молоко, хлеб и 2 кг яблок» → три товара.
    \b с кириллицей в JS не работает (и — не \w), поэтому союзы режем по пробелам. */
 function parseMany(raw){
+  _splitAmbiguous = false;
   var chunks = String(raw||'')
     .replace(/\n/g, ',')
     .split(/\s*[,;+]\s*|\s+(?:и|і|та|й|and|und|et|plus|плюс)\s+/i);
@@ -639,8 +654,13 @@ var VAGUE = new RegExp(
 function needsAi(parsed, raw){
   if(VAGUE.test(String(raw||''))) return true;   /* описан повод, а не товар */
   if(!parsed.length) return true;                /* совсем не разобрали */
+  if(_splitAmbiguous) return true;               /* определение между товарами */
   for(var i=0;i<parsed.length;i++){
     if(!parsed[i].key) return true;              /* товара нет в каталоге */
+    /* Три слова и больше — почти наверняка склейка: настоящее название товара
+       редко длиннее двух слов, а вот «Хлеб защитное стекло» получается именно
+       так, когда посреди фразы попался товар, которого каталог не знает. */
+    if(parsed[i].name.split(/\s+/).length >= 3) return true;
   }
   return false;
 }
