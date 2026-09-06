@@ -231,7 +231,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.7.1';
+var APP_VERSION = '0.7.2';
 var WORKER_URL  = 'https://wandering-meadow-aecb.mnacik1988.workers.dev';
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -686,7 +686,11 @@ function aiParse(text, cb){
     var d = res.data || {};
     if(typeof d.left === 'number') state.aiLeft = d.left;
     if(res.status === 429 || d.error === 'limit'){ state.aiLeft = 0; cb(null, 'limit'); return; }
-    if(d.error || !d.items){ cb(null, d.error || 'error'); return; }
+    /* Именно Array.isArray, а не «есть и непустой»: строка тоже правдива и
+       тоже имеет length, поэтому проскочила бы дальше и разобралась
+       посимвольно — список молча оказался бы пустым, а локальный разбор,
+       который в этот момент уже готов, не подставился бы. */
+    if(d.error || !Array.isArray(d.items)){ cb(null, d.error || 'error'); return; }
     cb(d.items, null);
   })
   .catch(function(){ if(!fired){ fired = true; clearTimeout(timer); cb(null, 'network'); } });
@@ -723,12 +727,19 @@ function addText(raw){
     state.busy = true; state.hint = t('thinking'); render();
     aiParse(raw, function(aiItems, err){
       state.busy = false; state.hint = '';
-      if(aiItems && aiItems.length){ putAiItems(aiItems); return; }
+      if(Array.isArray(aiItems) && aiItems.length){ putAiItems(aiItems); return; }
       /* ИИ не ответил или отказал — молча не теряем сказанное,
          кладём то, что разобрали сами, и объясняем почему. */
-      if(err === 'limit') toast(t('aiLimit'));
-      else if(err) toast(t('aiOff'));
+      /* Объяснение — в строку подсказки, а не плашкой: плашку через миг
+         перебьёт «Добавлено: N» от локального разбора, и причину никто не
+         прочитает. */
+      if(err){
+        state.hint = (err === 'limit') ? t('aiLimit') : t('aiOff');
+        clearTimeout(_hintTimer);
+        _hintTimer = setTimeout(function(){ state.hint = ''; renderHint(); }, 3500);
+      }
       addParsed(parsed);
+      renderHint();
     });
     return parsed.length;
   }
@@ -738,6 +749,7 @@ function addText(raw){
 /* Товары от ИИ кладём тем же путём, что и локальные: тот же поиск дубля
    по названию, тот же откат кнопкой «Вернуть». */
 function putAiItems(list){
+  if(!Array.isArray(list)) return;
   var arr = curList().items, added = [];
   for(var i=0;i<list.length;i++){
     var it = itemFromAi(list[i]);
@@ -978,7 +990,14 @@ function micToggle(){
   rec.lang = voiceLangTag();
   rec.interimResults = true;
   rec.continuous = false;
-  var finalTx = '';
+  /* Распознавание отдаёт текст двумя сортами: черновой (уточняется на ходу)
+     и окончательный. Я брал только окончательный — и если распознавание
+     завершалось, пока последний кусок ещё числился черновым, вся фраза молча
+     пропадала. Чем длиннее фраза, тем чаще: «Купить хлеб, яблоки, кефир,
+     сметана» терялась, а «хлеб, яблоки» успевала стать окончательной.
+     Теперь помним и черновой вариант: лучше добавить чуть менее точный текст,
+     чем потерять сказанное целиком. */
+  var finalTx = '', lastTx = '';
   rec.onstart = function(){ state.recording = true; state.hint = t('listen'); render(); };
   rec.onresult = function(e){
     var interim = '';
@@ -986,8 +1005,9 @@ function micToggle(){
       if(e.results[i].isFinal) finalTx += e.results[i][0].transcript;
       else interim += e.results[i][0].transcript;
     }
-    state.hint = (finalTx + ' ' + interim).trim() || t('listen');
-    var f = document.getElementById('addinp'); if(f) f.value = (finalTx + ' ' + interim).trim();
+    lastTx = (finalTx + ' ' + interim).trim();
+    state.hint = lastTx || t('listen');
+    var f = document.getElementById('addinp'); if(f) f.value = lastTx;
     renderHint();
   };
   rec.onerror = function(e){
@@ -997,7 +1017,8 @@ function micToggle(){
   };
   rec.onend = function(){
     state.recording = false; state.hint = '';
-    if(finalTx.trim()){ addText(finalTx); }
+    var said = finalTx.trim() || lastTx.trim();
+    if(said){ addText(said); }
     var f = document.getElementById('addinp'); if(f) f.value = '';
     render();
   };
