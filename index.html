@@ -231,7 +231,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.7.2';
+var APP_VERSION = '0.7.3';
 var WORKER_URL  = 'https://wandering-meadow-aecb.mnacik1988.workers.dev';
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -375,6 +375,25 @@ var NUMWORDS = {
   'eins':1,'zwei':2,'drei':3,'vier':4,'fünf':5,'sechs':6,'sieben':7,'acht':8,'neun':9,'zehn':10,
   'un':1,'une':1,'deux':2,'trois':3,'quatre':4,'cinq':5,'six ':6,'sept':7,'huit':8,'neuf':9,'dix':10
 };
+/* Тара и счётные слова: «пачку соли», «бутылку масла», «десяток яиц».
+   Само это слово — не товар, оно задаёт количество, и если его не снять,
+   в списке появляется пункт «Пачку соли». Числа рядом обычно нет, поэтому
+   обычный разбор количества сюда не дотягивался. */
+var CONTAINERS = [
+  ['пачк','pack',1], ['упаковк','pack',1], ['коробк','pack',1], ['коробочк','pack',1],
+  ['бутылк','pc',1], ['банк','pc',1], ['баночк','pc',1],
+  ['десяток','pc',10], ['дюжин','pc',12], ['полдюжин','pc',6]
+];
+function containerAt(w){
+  w = String(w||'').toLowerCase().replace(/[^0-9a-zа-яёіїєґ]/g,'');
+  for(var i=0;i<CONTAINERS.length;i++){
+    if(w.length >= 4 && w.indexOf(CONTAINERS[i][0]) === 0){
+      return { unit: CONTAINERS[i][1], qty: CONTAINERS[i][2] };
+    }
+  }
+  return null;
+}
+
 /* числа словом, которые сами задают единицу */
 var NUMUNIT = {'полкило':'kg','полкилограмма':'kg','кило':'kg','килограмм':'kg','півкіло':'kg','kilo':'kg','half a kilo':'kg'};
 /* Слова, с которых человек НАЧИНАЕТ фразу, но которые не товар: приказ
@@ -453,6 +472,10 @@ function parseOne(raw){
   if(!s) return null;
   s = stripNoise(s);
   if(!s) return null;
+  /* Ни одной буквы — это не товар. Прилетает с голоса, когда распознавание
+     услышало шум и отдало одни знаки препинания; без проверки в списке
+     появлялся пункт «!!!». */
+  if(!HAS_LETTER.test(s)) return null;
 
   var qty = null, unit = null;
 
@@ -480,6 +503,22 @@ function parseOne(raw){
       if(u2 || !m2[3]){ qty = normNum(m2[2]); unit = u2; s = m2[1]; }
     }
   }
+  /* Слово меры, оставшееся в начале: «литр молока» (числа нет вовсе),
+     «два литра молока» (число словом, поэтому единицу не забрал разбор выше),
+     «пачку соли» (мерой служит тара). Не снимешь — в списке будет пункт
+     «Литр молока» или «Пачку соли». */
+  var firstW = s.split(' ')[0];
+  var u0 = unitFromWord(firstW);
+  var cont = u0 ? null : containerAt(firstW);
+  if(u0 && unit === null){
+    unit = u0;
+    if(qty === null) qty = 1;
+    s = s.split(' ').slice(1).join(' ');
+  } else if(cont && unit === null){
+    unit = cont.unit;
+    if(qty === null) qty = cont.qty;
+    s = s.split(' ').slice(1).join(' ');
+  }
   s = s.replace(/^(?:кг|г|гр|л|мл|шт|уп|kg|g|l|ml|pcs)\s+/i,'').trim();
   s = s.replace(/^[,.\s-]+|[,.\s]+$/g,'');
   if(!s) return null;
@@ -498,7 +537,12 @@ function parseOne(raw){
      «яблок»→«Яблоки» и «картошка»→«Картофель» пройдут, «кефир»→«Сметана» нет. */
   if(hit && hit.parts === hit.words){
     var canon = nbTitle(hit.key, state.lang);
-    if(canon && canon.slice(0,4).toLowerCase() === s.slice(0,4).toLowerCase()) name = canon;
+    /* Сверяем три первые буквы, а не четыре: «сыра» и «Сыр», «соли» и «Соль»
+       расходятся уже на четвёртой, и падеж оставался в списке («Сыра 0,5 кг»).
+       Ограничение по длине не даёт короткому витринному имени проглотить
+       длинное слово: «чайник» не должен превратиться в «Чай». */
+    if(canon && s.length <= canon.length + 2 &&
+       canon.slice(0,3).toLowerCase() === s.slice(0,3).toLowerCase()) name = canon;
   }
   return {
     name: name,
@@ -655,7 +699,13 @@ var VAGUE = new RegExp(
   'quelque\\s+chose|pour\\s+(le\\s+)?(d[iî]ner|d[ée]jeuner|go[uû]ter)',
   'i');
 
+var HAS_LETTER = /[a-zа-яёіїєґäöüßàâçéèêëîïôùûœ]/i;
+
 function needsAi(parsed, raw){
+  /* Ни одной буквы — звать ИИ не за чем: он всё равно вернёт пустой список,
+     а разбор спишется с дневной квоты. Такое прилетает с голоса, когда
+     распознавание услышало только шум и отдало знаки препинания. */
+  if(!HAS_LETTER.test(String(raw||''))) return false;
   if(VAGUE.test(String(raw||''))) return true;   /* описан повод, а не товар */
   if(!parsed.length) return true;                /* совсем не разобрали */
   if(_splitAmbiguous) return true;               /* определение между товарами */
