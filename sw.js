@@ -16,8 +16,10 @@ self.addEventListener('activate', function(e){
     // Чистим ТОЛЬКО свои старые кеши. Cache Storage общий на весь origin, а
     // на mnacik1988.github.io живут и другие приложения (Mynado, InveStory
     // и прочие) — раньше отсюда сносились и они, то есть обновление
-    // NeedBuy отбирало офлайн у соседей (аудит 2026-09-22; подтверждено:
-    // у Mynado свой кеш vtodo-shell-*, у InveStory kapital-*).
+    // NeedBuy отбирало офлайн у соседей (аудит 2026-09-22; проверено живьём:
+    // у Mynado кеш vtodo-shell-*, у InveStory investory-app-*).
+    // ⚠️ Старая выкладка /InveStory/ (кеш kapital-*) до сих пор чистит ВСЁ подряд
+    // и снесёт наш кеш, если кто-то на неё зайдёт — лечится только там.
     return Promise.all(
       keys.filter(function(k){ return k !== CACHE_NAME && k.indexOf(CACHE_PREFIX) === 0; })
           .map(function(k){ return caches.delete(k); })
