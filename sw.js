@@ -1,7 +1,8 @@
 /* NeedBuy service worker — офлайн-оболочка.
    Стратегия: сеть первым делом, кэш как запасной вариант.
    ВАЖНО: при каждом релизе поднимать CACHE_NAME вместе с APP_VERSION в index.html. */
-var CACHE_NAME = 'needbuy-v0.7.3';
+var CACHE_PREFIX = 'needbuy-';
+var CACHE_NAME = CACHE_PREFIX + 'v0.7.4';
 var ASSETS = ['./', './index.html', './catalog.js', './icons.js', './manifest.json',
               './icon.png', './icon-maskable.png', './apple-touch-icon.png'];
 
@@ -12,7 +13,15 @@ self.addEventListener('install', function(e){
 
 self.addEventListener('activate', function(e){
   e.waitUntil(caches.keys().then(function(keys){
-    return Promise.all(keys.map(function(k){ if(k !== CACHE_NAME) return caches.delete(k); }));
+    // Чистим ТОЛЬКО свои старые кеши. Cache Storage общий на весь origin, а
+    // на mnacik1988.github.io живут и другие приложения (Mynado, InveStory
+    // и прочие) — раньше отсюда сносились и они, то есть обновление
+    // NeedBuy отбирало офлайн у соседей (аудит 2026-09-22; подтверждено:
+    // у Mynado свой кеш vtodo-shell-*, у InveStory kapital-*).
+    return Promise.all(
+      keys.filter(function(k){ return k !== CACHE_NAME && k.indexOf(CACHE_PREFIX) === 0; })
+          .map(function(k){ return caches.delete(k); })
+    );
   }).then(function(){ return self.clients.claim(); }));
 });
 

@@ -41,8 +41,10 @@ html = html.replace("var APP_VERSION = '%s'" % old, "var APP_VERSION = '%s'" % n
 io.open(HTML, 'w', encoding='utf-8').write(html)
 
 sw = io.open(SW, encoding='utf-8').read()
-sw2 = re.sub(r"var CACHE_NAME\s*=\s*'needbuy-v[^']*'",
-             "var CACHE_NAME = 'needbuy-v%s'" % new, sw)
+# Имя кеша собирается из CACHE_PREFIX — правим только хвост с версией,
+# сам префикс трогать нельзя: по нему activate отличает СВОИ кеши от соседских.
+sw2 = re.sub(r"var CACHE_NAME\s*=\s*CACHE_PREFIX\s*\+\s*'v[^']*'",
+             "var CACHE_NAME = CACHE_PREFIX + 'v%s'" % new, sw)
 if sw2 == sw:
     sys.exit('Не нашёл CACHE_NAME в ' + SW + ' — версия поднята только наполовину!')
 io.open(SW, 'w', encoding='utf-8').write(sw2)
