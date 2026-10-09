@@ -65,7 +65,7 @@ var P = [
 ['fish','meat','kg',{ru:['рыб','лосос','селёдк','селедк','форел','тунец'],en:['fish','salmon','tuna','herring'],uk:['риб','лосос','оселедц'],de:['fisch','lachs','thunfisch'],fr:['poisson','saumon','thon']}],
 ['bacon','meat','pc',{ru:['бекон','ветчин','сал'],en:['bacon','ham'],uk:['бекон','шинк','сал'],de:['speck','schinken'],fr:['bacon','jambon']}],
 /* --- бакалея --- */
-['rice','grocery','kg',{ru:['рис','гречк','греч','крупа','пшён','пшен','булгур','кускус'],en:['rice','buckwheat','groats','bulgur','couscous'],uk:['рис','гречк','крупа'],de:['reis','buchweizen','grütze'],fr:['riz','sarrasin']}],
+['rice','grocery','kg',{ru:['рис','крупа','крупу','пшён','пшен','булгур','кускус'],en:['rice','groats','bulgur','couscous'],uk:['рис','крупа','крупу'],de:['reis','grütze'],fr:['riz']}],
 ['pasta','grocery','pc',{ru:['макарон','паст','спагетт','вермишел','лапш'],en:['pasta','spaghetti','noodle','macaroni'],uk:['макарон','спагет','локшин'],de:['nudel','pasta','spaghetti'],fr:['pâtes','spaghetti','nouille']}],
 ['flour','grocery','kg',{ru:['мук'],en:['flour'],uk:['борошн'],de:['mehl'],fr:['farine']}],
 ['sugar','grocery','kg',{ru:['сахар','сахарн'],en:['sugar'],uk:['цукор','цукр'],de:['zucker'],fr:['sucre']}],
@@ -84,6 +84,31 @@ var P = [
 ['soda','drinks','l',{ru:['газиров','кол','лимонад','спрайт','фант'],en:['soda','cola','lemonade'],uk:['газован','кол','лимонад'],de:['limonade','cola'],fr:['soda','cola','limonade']}],
 ['beer','drinks','pc',{ru:['пив'],en:['beer'],uk:['пив'],de:['bier'],fr:['bière']}],
 ['wine','drinks','pc',{ru:['вин','шампанск','игрист'],en:['wine','champagne'],uk:['вин','шампанськ'],de:['wein','sekt'],fr:['vin','champagne']}],
+/* --- добавлено 09.10: частые товары, которых не хватало --- */
+/* Основы подобраны так, чтобы не задевать соседей:
+   «слива/сливы», а не «слив» — иначе цеплялись бы «сливки» и «сливочное»;
+   «зелень/зелени», а не «зелен» — иначе «зеленые яблоки» становились бы зеленью;
+   «мороженое» целиком — иначе «мороженая рыба» становилась бы мороженым. */
+['kiwi','fruit','pc',{ru:['киви'],en:['kiwi'],uk:['ківі'],de:['kiwi'],fr:['kiwi']}],
+['pineapple','fruit','pc',{ru:['ананас'],en:['pineapple'],uk:['ананас'],de:['ananas'],fr:['ananas']}],
+['plum','fruit','kg',{ru:['слива','сливу','сливы','сливой','алыч'],en:['plum'],uk:['слива','сливи'],de:['pflaume','zwetschg'],fr:['prune']}],
+['cherry','fruit','kg',{ru:['вишн','черешн'],en:['cherr'],uk:['вишн','черешн'],de:['kirsch'],fr:['cerise']}],
+['pomegranate','fruit','pc',{ru:['гранат'],en:['pomegranate'],uk:['гранат'],de:['granatapfel'],fr:['grenade']}],
+['berries','fruit','pack',{ru:['малин','черник','голубик','ягод','смородин','клюкв','ежевик','брусник'],en:['raspberr','blueberr','blackberr','cranberr','berr'],uk:['малин','чорниц','лохин','ягід','ягод','смородин','журавлин'],de:['himbeer','heidelbeer','blaubeer','johannisbeer','beere'],fr:['framboise','myrtille','cassis','baie']}],
+['beet','veg','kg',{ru:['свекл','свёкл','бурак'],en:['beet'],uk:['буряк'],de:['rote bete','rote beete','randen'],fr:['betterave']}],
+['zucchini','veg','kg',{ru:['кабачк','кабачок','цукини'],en:['zucchini','courgette'],uk:['кабачк','кабачок','цукіні'],de:['zucchini'],fr:['courgette']}],
+['eggplant','veg','kg',{ru:['баклажан'],en:['eggplant','aubergine'],uk:['баклажан'],de:['aubergine'],fr:['aubergine']}],
+['greens','veg','pack',{ru:['зелень','зелени','укроп','петрушк','кинз','базилик','щавел','шпинат'],en:['herbs','dill','parsley','cilantro','coriander','basil','spinach'],uk:['зелень','зелені','кріп','кропу','петрушк','кінз','базилік','шпинат'],de:['kräuter','dill','petersilie','koriander','basilikum','spinat'],fr:['herbes','aneth','persil','coriandre','basilic','épinard']}],
+['lettuce','veg','pc',{ru:['салат','латук','айсберг','руккол'],en:['lettuce','salad','arugula','rocket'],uk:['салат','руккол'],de:['salat','kopfsalat','rucola'],fr:['salade','laitue','roquette']}],
+['caviar','meat','pc',{ru:['икр'],en:['caviar','roe'],uk:['ікр'],de:['kaviar'],fr:['caviar']}],
+['shrimp','meat','kg',{ru:['креветк','кальмар','мидии','мидий','морепродукт'],en:['shrimp','prawn','squid','mussel','seafood'],uk:['креветк','кальмар','мідії','морепродукт'],de:['garnele','krabbe','tintenfisch','muschel','meeresfrücht'],fr:['crevette','calmar','moule','fruits de mer']}],
+['dumplings','grocery','pack',{ru:['пельмен','вареник','хинкал','манты'],en:['dumpling','pelmeni','ravioli'],uk:['пельмен','вареник'],de:['pelmeni','maultasche','teigtasche'],fr:['ravioli','pelmeni']}],
+['buckwheat','grocery','kg',{ru:['гречк','греч'],en:['buckwheat'],uk:['гречк','греч'],de:['buchweizen'],fr:['sarrasin']}],
+['mayo','grocery','pc',{ru:['майонез'],en:['mayo'],uk:['майонез'],de:['mayo'],fr:['mayonnaise']}],
+['ketchup','grocery','pc',{ru:['кетчуп'],en:['ketchup'],uk:['кетчуп'],de:['ketchup'],fr:['ketchup']}],
+['chips','grocery','pack',{ru:['чипс','сухарик','крекер','попкорн'],en:['chips','crisps','cracker','popcorn'],uk:['чипс','сухарик','крекер','попкорн'],de:['chips','cracker','popcorn'],fr:['chips','cracker','popcorn','pop-corn']}],
+['canned','grocery','pc',{ru:['консерв','тушенк','тушёнк','шпрот','сайр','горошек','фасол'],en:['canned','tinned'],uk:['консерв','тушонк','шпрот','горошок','квасол'],de:['konserve','dosen'],fr:['conserve','haricot']}],
+['icecream','dairy','pc',{ru:['мороженое','мороженого','мороженым','мороженки','пломбир','эскимо'],en:['ice cream','icecream','gelato'],uk:['морозив','пломбір','ескімо'],de:['eiscreme','speiseeis','eis am stiel'],fr:['glace']}],
 /* --- хозтовары --- */
 ['toiletpaper','house','pc',{ru:['туалетн бумаг','туалетную бумаг','бумаг туалет'],en:['toilet paper'],uk:['туалетн папір'],de:['toilettenpapier','klopapier'],fr:['papier toilette']}],
 ['papertowel','house','pc',{ru:['полотенц бумажн','бумажн полотенц','салфетк'],en:['paper towel','napkin'],uk:['паперов рушник','серветк'],de:['küchenrolle','servietten'],fr:['essuie-tout','serviette']}],
@@ -191,7 +216,27 @@ diapers:['Подгузники','Diapers','Підгузки','Windeln','Couches'
 petfood:['Корм','Pet food','Корм','Tierfutter','Croquettes'],
 battery:['Батарейки','Batteries','Батарейки','Batterien','Piles'],
 bulb:['Лампочка','Light bulb','Лампочка','Glühbirne','Ampoule'],
-medicine:['Лекарства','Medicine','Ліки','Medikamente','Médicaments']
+medicine:['Лекарства','Medicine','Ліки','Medikamente','Médicaments'],
+kiwi:['Киви','Kiwi','Ківі','Kiwi','Kiwi'],
+pineapple:['Ананас','Pineapple','Ананас','Ananas','Ananas'],
+plum:['Сливы','Plums','Сливи','Pflaumen','Prunes'],
+cherry:['Вишня','Cherries','Вишні','Kirschen','Cerises'],
+pomegranate:['Гранат','Pomegranate','Гранат','Granatapfel','Grenade'],
+berries:['Ягоды','Berries','Ягоди','Beeren','Baies'],
+beet:['Свёкла','Beetroot','Буряк','Rote Bete','Betterave'],
+zucchini:['Кабачки','Zucchini','Кабачки','Zucchini','Courgettes'],
+eggplant:['Баклажаны','Eggplant','Баклажани','Auberginen','Aubergines'],
+greens:['Зелень','Herbs','Зелень','Kräuter','Herbes'],
+lettuce:['Салат','Lettuce','Салат','Salat','Salade'],
+caviar:['Икра','Caviar','Ікра','Kaviar','Caviar'],
+shrimp:['Креветки','Shrimp','Креветки','Garnelen','Crevettes'],
+dumplings:['Пельмени','Dumplings','Пельмені','Pelmeni','Raviolis'],
+buckwheat:['Гречка','Buckwheat','Гречка','Buchweizen','Sarrasin'],
+mayo:['Майонез','Mayonnaise','Майонез','Mayonnaise','Mayonnaise'],
+ketchup:['Кетчуп','Ketchup','Кетчуп','Ketchup','Ketchup'],
+chips:['Чипсы','Chips','Чипси','Chips','Chips'],
+canned:['Консервы','Canned food','Консерви','Konserven','Conserves'],
+icecream:['Мороженое','Ice cream','Морозиво','Eis','Glace']
 };
 var LANG_IX = {ru:0, en:1, uk:2, de:3, fr:4};
 

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeedBuy — галерея иллюстраций</title>
+<!-- Служебная страница для проверки рисунков: все иконки разом, крупно и в
+     размере плитки, на светлом и тёмном фоне. Нужна, чтобы ловить промахи
+     вроде «глаз у рыбы возле хвоста» до того, как их увидит человек.
+     В приложение не подключена, на работу не влияет. -->
+<style>
+  body{margin:0;font:12px -apple-system,Segoe UI,Roboto,sans-serif;background:#F4F1EA;color:#333}
+  h2{margin:18px 14px 8px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--cell,150px),1fr));gap:8px;padding:0 12px 12px}
+  .cell{background:#fff;border-radius:16px;padding:8px 4px 6px;text-align:center}
+  .cell.dark{background:#1D2740;color:#cfd6e6}
+  .row{display:flex;justify-content:center;align-items:flex-end;gap:6px}
+  .name{margin-top:4px}
+</style>
+</head>
+<body>
+<div id="out"></div>
+<script src="icons.js"></script>
+<script>
+  document.body.insertAdjacentHTML('afterbegin', nbDefsSvg());
+  var params = new URLSearchParams(location.search);
+  var only = (params.get('only') || '').split(',').filter(Boolean);
+  var dark = params.get('dark') === '1';
+  var big = parseInt(params.get('size') || '104', 10);
+  var keys = Object.keys(NB_ICONS).filter(function(k){ return !only.length || only.indexOf(k) >= 0; });
+  document.documentElement.style.setProperty('--cell', (big + 60) + 'px');
+  document.getElementById('out').innerHTML =
+    '<h2>' + keys.length + ' иллюстраций</h2><div class="grid">' +
+    keys.map(function(k){
+      return '<div class="cell' + (dark ? ' dark' : '') + '"><div class="row">' +
+        nbIconSvg(k, big) + nbIconSvg(k, 40) + '</div><div class="name">' + k + '</div></div>';
+    }).join('') + '</div>';
+</script>
+</body>
+</html>

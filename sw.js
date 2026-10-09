@@ -2,7 +2,7 @@
    Стратегия: сеть первым делом, кэш как запасной вариант.
    ВАЖНО: при каждом релизе поднимать CACHE_NAME вместе с APP_VERSION в index.html. */
 var CACHE_PREFIX = 'needbuy-';
-var CACHE_NAME = CACHE_PREFIX + 'v0.7.4';
+var CACHE_NAME = CACHE_PREFIX + 'v0.8.0';
 var ASSETS = ['./', './index.html', './catalog.js', './icons.js', './manifest.json',
               './icon.png', './icon-maskable.png', './apple-touch-icon.png'];
 

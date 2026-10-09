@@ -231,7 +231,7 @@ input,select,textarea{font:inherit;color:inherit}
    Движок унаследован от Mynado (тот же подход: ванильный JS, полный ре-рендер),
    но UI, данные и разбор фраз — свои, магазинные.
    ========================================================================= */
-var APP_VERSION = '0.7.4';
+var APP_VERSION = '0.8.0';
 var WORKER_URL  = 'https://wandering-meadow-aecb.mnacik1988.workers.dev';
 var STORE_KEY   = 'needbuy-state';
 var FREQ_KEY    = 'needbuy-freq';
@@ -541,8 +541,10 @@ function parseOne(raw){
        расходятся уже на четвёртой, и падеж оставался в списке («Сыра 0,5 кг»).
        Ограничение по длине не даёт короткому витринному имени проглотить
        длинное слово: «чайник» не должен превратиться в «Чай». */
-    if(canon && s.length <= canon.length + 2 &&
-       canon.slice(0,3).toLowerCase() === s.slice(0,3).toLowerCase()) name = canon;
+    /* ё и е сверяем как одну букву: голос пишет «свеклу», а витрина — «Свёкла» */
+    var c3 = canon.slice(0,3).toLowerCase().replace(/ё/g,'е');
+    var s3 = s.slice(0,3).toLowerCase().replace(/ё/g,'е');
+    if(canon && s.length <= canon.length + 2 && c3 === s3) name = canon;
   }
   return {
     name: name,
