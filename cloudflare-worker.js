@@ -26,14 +26,27 @@
    станет браться из подписанного токена, и слой устройства просто отключится.
    ========================================================================== */
 
-var VERSION = '1.0.2';
+var VERSION = '1.1.0';
 
 /* Модель и потолок ответа решает СЕРВЕР. Клиент на это влиять не может.
    Haiku — самая дешёвая модель; разбор фразы в список это простая задача
-   извлечения, тяжёлая модель тут не нужна. Захочешь точнее — поменяй одну
-   строку на 'claude-sonnet-5' или 'claude-opus-5'. */
-var MODEL = 'claude-haiku-4-5';
-var MAX_TOKENS = 1500;
+   извлечения, тяжёлая модель тут не нужна.
+
+   11.10.2026 — Haiku 4.5 → 5.5, вслед за Mynado (там проверено на 120+
+   настоящих запросах: точнее и примерно в 5 раз дешевле за запрос).
+   У 5.5 размышление включено по умолчанию: ответ приходит блоками
+   [thinking, text], и размышление входит в max_tokens. Поэтому потолок
+   1500 → 4000 — иначе на длинной диктовке размышление съест лимит и JSON
+   оборвётся. Платим только за использованное: 4000 × $0.50/млн = $0.002,
+   дешевле прежнего потолка 1500 × $5/млн = $0.0075.
+   temperature и предзаполнение ответа у 5.5 дают ошибку 400 — их тут нет
+   и добавлять нельзя. */
+var MODEL = 'claude-haiku-5-5';
+var MAX_TOKENS = 4000;
+/* Если новая модель недоступна ключу (404 / 400 про модель) — тихо уходим
+   на прежнюю, чтобы приложение не осталось без ИИ. */
+var FALLBACK_MODEL = 'claude-haiku-4-5';
+var FALLBACK_MAX_TOKENS = 1500;
 
 /* Три слоя лимитов. Каждый закрывает дыру в предыдущем:
      DEVICE — честный лимит для честного человека;
@@ -219,25 +232,37 @@ async function handleParse(request, env, origin) {
 
   var left = Math.max(0, LIMIT_DEVICE_DAY - pd.used);
 
-  var resp;
-  try {
-    resp = await fetch('https://api.anthropic.com/v1/messages', {
+  /* Собираем тело сами. Из присланного клиентом сюда попадает
+     ровно одна строка — текст фразы. Ни модель, ни потолок токенов,
+     ни системная инструкция клиенту не подвластны. */
+  function ask(model, maxTokens) {
+    return fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
         'content-type': 'application/json'
       },
-      /* Собираем тело сами. Из присланного клиентом сюда попадает
-         ровно одна строка — текст фразы. Ни модель, ни потолок токенов,
-         ни системная инструкция клиенту не подвластны. */
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: MAX_TOKENS,
+        model: model,
+        max_tokens: maxTokens,
         system: systemPrompt(),
         messages: [{ role: 'user', content: text }]
       })
     });
+  }
+
+  var resp;
+  try {
+    resp = await ask(MODEL, MAX_TOKENS);
+    if (resp.status === 404 || resp.status === 400) {
+      var why = '';
+      try { why = await resp.clone().text(); } catch (e4) {}
+      if (resp.status === 404 || /model/i.test(why)) {
+        console.log('model ' + MODEL + ' failed (' + resp.status + '), fallback to ' + FALLBACK_MODEL);
+        resp = await ask(FALLBACK_MODEL, FALLBACK_MAX_TOKENS);
+      }
+    }
   } catch (e) {
     return json({ error: 'upstream', message: 'Модель недоступна' }, 502, origin);
   }
