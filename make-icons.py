@@ -1,84 +1,62 @@
 # -*- coding: utf-8 -*-
-"""Рисует иконки приложения NeedBuy.
-
-Рисуем в 4-кратном размере и уменьшаем — так края получаются гладкими
-без всяких библиотек сглаживания.
+"""Собирает иконки приложения NeedBuy из готового логотипа logo.png.
 
     python make-icons.py
 
-На выходе: icon.png (обычная), icon-maskable.png (с полями под круглую
-обрезку Android — там система режет углы, поэтому рисунок мельче),
-apple-touch-icon.png (180×180 для iPhone).
+logo.png — логотип от Александра (22.10.2026): 512×512, золотая корзина на
+тёмно-синем градиенте, углы СКРУГЛЕНЫ и прозрачны. Раньше иконку рисовал этот
+же скрипт с нуля; теперь исходник — картинка, а скрипт только готовит из неё
+три файла.
+
+Зачем вообще готовить, а не положить логотип как есть: прозрачные углы
+годятся не везде.
+  - iPhone сам скругляет иконку, а прозрачное заливает ЧЁРНЫМ — на домашнем
+    экране вылезли бы чёрные уголки. Ему нужен полный квадрат без прозрачности.
+  - Android для maskable-иконки режет свою форму (круг, капля) из полного
+    квадрата; прозрачные углы дали бы дыры по краям.
+Поэтому углы достраиваем тем же градиентом, что и фон логотипа: для каждой
+строки берём цвет фона у её края и подкладываем под строку.
+
+На выходе: icon.png (как есть, со скруглением), icon-maskable.png и
+apple-touch-icon.png (180×180) — оба полным квадратом.
 """
-from PIL import Image, ImageDraw
+from PIL import Image
 
-S = 512          # итоговый размер
-K = 4            # во сколько раз рисуем крупнее
+SRC = 'logo.png'
+S = 512
 
-# Фамильные цвета: тёмно-синий фон и золотой знак — как у Mynado и InveStory.
-# Знак ОДНОЦВЕТНЫЙ: у Mynado это золотая галочка, у InveStory золотые столбики,
-# у нас золотая корзина. Пёстрый рисунок выбился бы из ряда на домашнем экране.
-BG_TOP    = (30, 42, 74)     # #1E2A4A
-BG_BOTTOM = (16, 24, 44)     # #10182C
-GOLD      = (242, 199, 94)   # #F2C75E
-GOLD_DARK = (208, 154, 46)   # #D09A2E
+logo = Image.open(SRC).convert('RGBA')
+if logo.size != (S, S):
+    logo = logo.resize((S, S), Image.LANCZOS)
 
+# Подложка: каждая строка залита цветом фона у её левого края (первый
+# полностью непрозрачный пиксель). У самого верха и низа, где строка целиком
+# в скруглении, берём ближайшую строку, где фон уже есть.
+px = logo.load()
+row_color = [None] * S
+for y in range(S):
+    for x in range(S // 3):
+        r, g, b, a = px[x, y]
+        if a == 255:
+            row_color[y] = (r, g, b)
+            break
+first = next(c for c in row_color if c)
+for y in range(S):
+    if row_color[y] is None:
+        row_color[y] = first
+    else:
+        first = row_color[y]
 
-def gradient(size, top, bottom):
-    """Вертикальная заливка от top к bottom."""
-    img = Image.new('RGB', (1, size))
-    px = img.load()
-    for y in range(size):
-        f = y / (size - 1)
-        px[0, y] = tuple(int(top[i] + (bottom[i] - top[i]) * f) for i in range(3))
-    return img.resize((size, size))
+under = Image.new('RGB', (S, S))
+up = under.load()
+for y in range(S):
+    for x in range(S):
+        up[x, y] = row_color[y]
 
+full = under.copy()
+full.paste(logo, (0, 0), logo)          # логотип поверх, края сглажены альфой
 
-def draw_basket(d, cx, cy, scale, main, deep):
-    """Корзина: дужка, ободок, корпус, прорези."""
-    def p(x, y):
-        return (cx + x * scale, cy + y * scale)
-
-    # дужка
-    d.arc([p(-88, -132)[0], p(-88, -132)[1], p(88, 44)[0], p(88, 44)[1]],
-          start=185, end=355, fill=main, width=int(26 * scale))
-
-    # ободок
-    d.rounded_rectangle([p(-116, -30), p(116, 16)], radius=int(23 * scale), fill=main)
-
-    # корпус — сужается книзу
-    d.polygon([p(-100, 16), p(100, 16), p(74, 132), p(-74, 132)], fill=main)
-    d.rounded_rectangle([p(-78, 104), p(78, 136)], radius=int(18 * scale), fill=main)
-
-    # прорези: цветом фона, поэтому корзина читается как плетёная
-    for x0, x1 in ((-46, -38), (-4, -4), (42, 34)):
-        d.line([p(x0, 34), p(x1, 108)], fill=deep, width=int(15 * scale))
-
-
-def build(inner_scale, out, size=S):
-    """inner_scale — насколько мельче рисунок относительно холста.
-       Для maskable нужно поле: Android режет углы под круг."""
-    big = size * K
-    img = gradient(big, BG_TOP, BG_BOTTOM).convert('RGBA')
-
-    # скругление углов только у обычной иконки; у maskable фон должен быть до краёв
-    if inner_scale > 0.85:
-        mask = Image.new('L', (big, big), 0)
-        ImageDraw.Draw(mask).rounded_rectangle([0, 0, big - 1, big - 1],
-                                               radius=int(big * 0.22), fill=255)
-        img.putalpha(mask)
-
-    d = ImageDraw.Draw(img)
-    cx = cy = big / 2
-    s = K * inner_scale
-    # тень под знаком — тем же синим, только глубже: даёт объём, как в приложении
-    draw_basket(d, cx, cy + 12 * s + 5 * s, s, (10, 16, 30), (10, 16, 30))
-    draw_basket(d, cx, cy + 12 * s, s, GOLD, BG_BOTTOM)
-
-    img.resize((size, size), Image.LANCZOS).save(out)
-    print('готово:', out, size)
-
-
-build(1.0, 'icon.png')                       # обычная, со скруглёнными углами
-build(0.72, 'icon-maskable.png')             # с полями под обрезку Android
-build(1.0, 'apple-touch-icon.png', 180)      # iPhone
+logo.save('icon.png')
+full.save('icon-maskable.png')
+full.resize((180, 180), Image.LANCZOS).save('apple-touch-icon.png')
+print('готово: icon.png, icon-maskable.png, apple-touch-icon.png')
